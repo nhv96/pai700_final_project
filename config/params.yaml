@@ -1,0 +1,159 @@
+# params.yaml - digital twin parameters, reference building: Swedish school, ONE classroom zone
+# Version 0.1 (2026-10-08). Public-data estimates, to be replaced with Kraftstaden data when available.
+#
+# confidence levels:
+#   sourced  = number taken from a public source (see `source`)
+#   derived  = calculated from sourced numbers (calculation in `note`)
+#   assumed  = engineering default, NOT verified in this research - check before using in the report
+#   unknown  = not found; left null on purpose
+#
+# NOT in this file: room thermal resistance R, heat capacity C, and the heat equation.
+# These belong to the heat-model blackbox (teammate).
+
+meta:
+  version: "0.1"
+  building_type: school
+  zones: 1
+  step_seconds: 60          # simulation step agreed with user
+  sensor_realism: off       # ideal sensors for now (no noise, delay or dropouts)
+  heat_model: blackbox      # plugged in later behind the HeatModel interface
+
+zone:
+  floor_area_m2:      {typical: 60,  min: 50, max: 70, confidence: assumed, source: "engineering default for one classroom", note: "SKR 2011: average school ~5000 m2 with 325 pupils (~15 m2/pupil incl. all rooms); a classroom is a small part of that"}
+  ceiling_height_m:   {typical: 3.0, min: 2.7, max: 3.5, confidence: assumed, source: "engineering default"}
+  volume_m3:          {typical: 180, confidence: derived, note: "60 m2 x 3.0 m"}
+  window_area_m2:     {typical: 10,  min: 6, max: 14, confidence: assumed, source: "engineering default, ~17% of floor area"}
+  window_orientation: {value: south, confidence: assumed, note: "worst case for solar overshoot; make configurable"}
+  window_solar_shading: {value: none, confidence: sourced, source: "SKR 2011 (STIL2): almost 3/4 of inventoried schools lacked solar shading", note: "effective external shading can cut solar heat by up to 90% (SKR 2011)"}
+
+# Reference values only, in case the heat-model owner wants them. Not used by the twin itself.
+envelope_reference:
+  window_u_value_W_m2K:
+    class_A_window: {value: 0.9, confidence: sourced, source: "SKR 2011 (energy labelling class A)"}
+    retrofit_inner_pane_low_e: {value: 1.8, confidence: sourced, source: "SKR 2011"}
+    retrofit_insulated_unit:   {value: 1.3, confidence: sourced, source: "SKR 2011"}
+    retrofit_third_pane:       {value: 1.4, confidence: sourced, source: "SKR 2011"}
+
+occupancy:
+  pupils_per_class:   {typical: 25, min: 20, max: 30, confidence: assumed, source: "engineering default"}
+  teachers_per_class: {typical: 1, confidence: assumed}
+  school_days_per_year: {typical: 165, confidence: sourced, source: "SKR 2011, ventilation section (~165 school days)"}
+  # Weekday schedule, occupancy_fraction = share of pupils present. All times assumed.
+  weekday_schedule:
+    confidence: assumed
+    source: "typical Swedish school day; replace with real timetable"
+    blocks:
+      - {start: "08:00", end: "09:30", occupancy_fraction: 1.0}
+      - {start: "09:30", end: "09:45", occupancy_fraction: 0.0}   # break
+      - {start: "09:45", end: "11:30", occupancy_fraction: 1.0}
+      - {start: "11:30", end: "12:30", occupancy_fraction: 0.0}   # lunch
+      - {start: "12:30", end: "15:00", occupancy_fraction: 1.0}
+  weekend_and_holiday_occupancy: {value: 0.0, confidence: assumed}
+  sanity_check_note: "SKR 2011: classrooms are empty ~85% of the year. This schedule gives about 5.75 h x 165 days = ~950 h = ~11% occupied, same order of magnitude"
+
+internal_gains:
+  sensible_heat_per_pupil_W:  {typical: 60, min: 50, max: 70, confidence: assumed, source: "engineering default for seated children; verify against EN 16798-1 / ISO 7730 tables"}
+  sensible_heat_per_adult_W:  {typical: 75, min: 70, max: 90, confidence: assumed, source: "engineering default"}
+  co2_generation_per_child_mg_per_min: {typical: 404, confidence: sourced, source: "classroom CO2 study cited in 'Selecting Ventilation Fan Capacity for University Classroom' (essd-487); secondary source, check original", note: "~3.7 mL/s per child"}
+  lighting_W_per_m2:
+    typical: 10
+    min: 8
+    max: 20
+    confidence: derived
+    source: "SKR 2011, Risbroskolan example: ~1200 W installed per classroom before retrofit, installed power cut by 55% after (T5 + presence control)"
+    note: "1200 W / 60 m2 = 20 W/m2 old; 540 W / 60 m2 = 9 W/m2 modern. Old and new both listed; pick per scenario"
+  classroom_equipment_W: {typical: 200, min: 100, max: 300, confidence: assumed, source: "teacher PC + projector/smartboard, engineering default", note: "SKR 2011: all IT and office equipment is only ~2.4 kWh/m2 per year across a school"}
+  pupil_laptops_W_each:  {typical: 30, count_default: 0, count_max: 25, confidence: assumed}
+
+solar:
+  radiation_source: {value: "SMHI STRANG (candidate)", confidence: unknown, note: "NOT verified in this research. Alternative: Open-Meteo. Resolve before coding the weather loader"}
+  window_g_value: {typical: 0.6, min: 0.4, max: 0.7, confidence: assumed, source: "typical double glazing, engineering default"}
+
+ventilation:
+  airflow_per_person_L_s:   {typical: 8, confidence: sourced, source: "AIVC 1992 case study of Swedish schools (Vaxjo): recommended 8 l/s per person; ASHRAE classroom model also uses 15 cfm = 8 L/s per person"}
+  airflow_per_area_L_s_m2:  {typical: 0.35, confidence: sourced, source: "SKR 2011, BBR energy table: 0.35 l/s per m2 baseline hygiene flow"}
+  design_flow_full_class_L_s: {typical: 221, confidence: derived, note: "25 x 8 + 60 x 0.35 = 221 L/s = ~4.4 air changes/h in 180 m3; ASHRAE classroom figure 3.8 L/s per m2 gives 228 L/s, consistent"}
+  operating_hours_per_year_avg: {typical: 3500, confidence: sourced, source: "SKR 2011"}
+  operating_hours_per_year_needed: {min: 1320, max: 2000, confidence: sourced, source: "SKR 2011"}
+  heat_recovery_efficiency: {typical: 0.0, min: 0.0, max: 0.9, confidence: sourced, source: "SKR 2011: FTX heat recovery 60-90%; many schools have none", note: "typical 0 = older school without heat recovery. Use 0.6-0.9 for FTX scenario"}
+  share_of_heat_loss_via_ventilation_without_recovery: {value: 0.40, confidence: sourced, source: "SKR 2011 (estimate)"}
+  demand_control: {value: "CO2-based in modern low-energy schools", confidence: sourced, source: "SBUF 13290 summary (Lund)"}
+  # The 'system fighting' behaviour from the team's problem analysis. Values assumed.
+  overheat_response:
+    trigger_temp_C: {typical: 24, confidence: assumed}
+    flow_multiplier_when_triggered: {typical: 1.5, confidence: assumed}
+    note: "mechanism from team's own problem description (ventilation ramps up to purge heat); numbers are placeholders"
+
+comfort:
+  setpoint_C:        {typical: 21, min: 20, max: 21, confidence: sourced, source: "SKR 2011: keep occupied rooms at 20-21 C"}
+  lower_limit_C:     {value: 20, confidence: sourced, source: "SKR 2011: sedentary work at least 20 C"}
+  discomfort_above_C: {value: 26, confidence: sourced, source: "SKR 2011: above about 26 C causes fatigue and reduced concentration"}
+  cost_per_degree:   {value: 0.05, confidence: sourced, source: "SKR 2011: ~5% heating cost per 1 C lower indoor temperature"}
+  setback_unoccupied_C: {typical: 17, min: 15, max: 19, confidence: assumed}
+
+heating_system:
+  type: {value: "district heating, substation, hot-water radiators", confidence: sourced, source: "SKR 2011: most Swedish schools use district heating"}
+  supply_temp_at_design_outdoor_C: {typical: 64, confidence: sourced, source: "Chalmers survey of 109 radiator systems in Gothenburg (Jangsten 2017): mean 64 C supply, 42 C return at -16 C"}
+  return_temp_at_design_outdoor_C: {typical: 42, confidence: sourced, source: "same survey"}
+  supply_temp_when_outdoor_5C_or_warmer_C: {max: 55, confidence: sourced, source: "same survey: all systems at or below 55 C"}
+  radiator_design_supply_C: {pre_1980: 80, post_1982_max: 60, confidence: sourced, source: "same survey"}
+  design_outdoor_temp_C: {value: -16, confidence: unknown, note: "value is from the Gothenburg survey; confirm Trollhattan design outdoor temperature (DVUT)"}
+  radiator_rated_output_W: {typical: 3000, min: 2000, max: 4500, confidence: assumed, source: "~50 W/m2 engineering default", decided_by_user: "3 kW confirmed as the working value (2026-10-08)", note: "still not a sourced value; the heat-loss owner should check it covers the room's design heat loss"}
+  radiator_modelled_in: {value: twin, note: "decision 2026-10-08: the twin computes q_radiator_W from valve position and t_supply_C and passes it to the heat model; the heat model does not compute radiator output"}
+  radiator_response_time_min: {typical: 15, min: 5, max: 30, confidence: assumed, note: "time for emitter output to follow a valve change, placeholder"}
+  heat_price_SEK_per_kWh: {min: 1.10, max: 1.35, confidence: sourced, source: "team's own district heating background document (not re-verified here)"}
+
+actuators:
+  smart_trv:
+    protocol: {value: "Zigbee 3.0", confidence: sourced, source: "Sonoff TRVZB, Salus TRV3RF, Shelly BLU TRV product pages"}
+    valve_thread: {value: "M30x1.5 (adapters for others)", confidence: sourced, source: "product pages"}
+    setpoint_range_C: {min: 8, max: 28, confidence: sourced, source: "NodOn Zigbee TRV spec"}
+    direct_valve_position_control: {value: true, confidence: sourced, source: "Shelly BLU TRV V2: can control by valve opening percentage"}
+    local_control: {value: "PI control", confidence: sourced, source: "Salus TRV3RF"}
+    motor_stroke_mm: {value: 5.5, confidence: sourced, source: "ApexGear TRV (one example product)"}
+    battery: {value: "up to 2 years / 3x AA", confidence: sourced, source: "Shelly BLU TRV; Sonoff TRV"}
+    price: {value: "approx GBP 26-58 or USD 30 per unit, retail", confidence: sourced, source: "retailer pages", note: "convert to SEK and use bulk price for the cost analysis later"}
+    time_to_move_full_stroke_s: {value: null, confidence: unknown, note: "not found; keep as config, default placeholder 60 s in code"}
+    reporting_interval_min: {typical: 10, min: 5, max: 15, confidence: assumed}
+    reference_mechanical_trv_retrofit_SEK_per_radiator: {min: 100, max: 300, confidence: sourced, source: "SKR 2011 (mechanical thermostatic valves)"}
+  supply_temp_offset:
+    range_K: {min: -10, max: 5, confidence: assumed, note: "heating curve parallel shift via substation controller, interface assumed"}
+
+sensors:
+  # Ideal in v0.1. Specs recorded for the later realism phase.
+  indoor_temp_co2_scd41:
+    co2_accuracy: {value: "+/-(40 ppm + 5% of reading), range 400-5000 ppm", confidence: sourced, source: "Sensirion SCD4x via SparkFun/retailer pages"}
+    temp_accuracy_C: {value: "about +/-0.4 to 0.8 (sources differ)", confidence: sourced, source: "esp32.co.uk SCD4x comparison", note: "a separate SHT4x sensor is suggested there for accurate temperature"}
+    low_power_interval_s: {value: 30, confidence: sourced, source: "esp32.co.uk SCD40/41 comparison"}
+  outdoor_temp:
+    source: {value: "SMHI hourly observations", confidence: sourced}
+  supply_return_temp:
+    sensor: {value: "DS18B20 class probe, about +/-0.5 C", confidence: assumed, note: "from general knowledge, not verified this session"}
+  heat_meter: {value: null, confidence: unknown, note: "not researched"}
+
+weather:
+  provider: {value: "SMHI Open Data (metobs)", confidence: sourced, source: "SMHI / wetterdienst docs"}
+  license: {value: "CC BY 4.0, no API key", confidence: sourced, source: "SMHI / wetterdienst docs"}
+  resolution: {value: "hourly (air temperature parameter 1, momentary value once per hour); 1-minute data only for the latest day", confidence: sourced, source: "SMHI API, wetterdienst docs"}
+  history_periods: {value: "corrected-archive (QC'd, up to ~3 months ago) + latest-months (~4 months, still under QC)", confidence: sourced, source: "wetterdienst docs"}
+  nearest_station:
+    name: "Trollhattan-Vanersborg Airport (ESGT)"
+    lat: 58.314
+    lon: 12.347
+    elevation_m: 40
+    smhi_station_id: null    # not resolved: station list was too long to browse. Resolve with smhi-open-data get_closest_station(lat, lon)
+    confidence: sourced
+    source: "meteo365 METAR station page; SMHI id still to be resolved"
+  python_clients: ["smhi-open-data (pip, has get_closest_station)", "wetterdienst"]
+
+validation_benchmarks:
+  # Use these to sanity-check the full twin once the heat model is plugged in.
+  avg_school_heat_use_kWh_m2_yr: {value: 152, confidence: sourced, source: "SKR 2011 citing STIL2 survey, year 2006"}
+  avg_school_total_energy_kWh_m2_yr: {value: 213, confidence: sourced, source: "SKR 2011 (STIL2, 2006). Report also gives 216 for the same year; small inconsistency in the source"}
+  avg_school_electricity_kWh_m2_yr: {value: 61, confidence: sourced, source: "SKR 2011"}
+  avg_school_size_m2: {value: 5000, confidence: sourced, source: "SKR 2011 ('a little under 5000 m2')"}
+  avg_pupils_per_school: {value: 325, confidence: sourced, source: "SKR 2011"}
+  sisab_district_heating_kWh_m2_yr: {from: 163, target_2020: 120, confidence: sourced, source: "SKR 2011 (Stockholm school company, 2009 baseline)"}
+  operations_optimisation_saving: {min: 0.10, max: 0.30, confidence: sourced, source: "SKR 2011: operations optimisation typically saves 10-30% energy"}
+  schools_with_air_climate_problems: {value: 0.75, confidence: sourced, source: "SKR 2011: nearly 75% of inventoried schools had air-climate problems, temperature most common"}
+  expected_classroom_annual_heat_kWh: {typical: 9120, confidence: derived, note: "152 kWh/m2 x 60 m2; average across the whole school, a classroom may differ"}
