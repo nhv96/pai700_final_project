@@ -1,0 +1,9 @@
+[project]
+name = "pai700-final-project"
+version = "0.1.0"
+description = "Digital twin of a school classroom heating system (PAI700)"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "pyyaml>=6.0",
+]
