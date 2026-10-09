@@ -29,3 +29,11 @@ Python 3.13, managed with uv. Parameters live in `config/params.yaml` (confidenc
 ## Plugging in the real heat model
 
 Implement `step(state, inputs, dt_s) -> ZoneState` (see `twin/interface.py`) and pass it as `model=` to `build_default_twin()`.
+
+## Docker
+
+```bash
+docker build -t pai700-twin .
+mkdir -p out && docker run --rm -v "$PWD/out:/app/out" --user "$(id -u):$(id -g)" pai700-twin
+head out/run.csv
+```
