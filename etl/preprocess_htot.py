@@ -72,12 +72,17 @@ def flat_run_mask(s: pd.Series, min_run: int) -> pd.Series:
 
 
 def to_gold(silver: pd.DataFrame) -> pd.DataFrame:
-    """Model-ready rows: short weather gaps interpolated, bad/empty HtTot rows dropped, split labelled."""
+    """Model-ready rows: short weather gaps interpolated, bad/empty HtTot rows dropped, calendar features and split added."""
     g = silver.copy()
     for col in WEATHER:
         g[col] = short_gap_interpolate(g[col], MAX_INTERP_HOURS)
     g.loc[g[TARGET].eq(0) | flat_run_mask(g[TARGET], FLAT_MIN_RUN), TARGET] = pd.NA
     g = g.dropna(subset=COLUMNS)
+
+    # calendar features, in the fixed UTC+1 time of the data (no DST shift)
+    g["hour"] = g.index.hour
+    g["weekday"] = g.index.dayofweek  # Monday = 0
+    g["month"] = g.index.month
 
     n = len(g)
     n_train, n_val = int(n * SPLIT[0]), int(n * SPLIT[1])

@@ -11,4 +11,5 @@ This file is to keep track of each decision made for selecting dataset to train 
 ## Notes
 
 - 2026-10-15: implemented in `etl/preprocess_htot.py`. Silver (`data/silver/building_<id>.parquet`) keeps all hours on a full hourly grid with only the sentinel and negative-solar fixes. Gold (`data/gold/htot_oslo.parquet`) applies the gap rules above and adds a `split` column.
+- 2026-10-15: gold also has calendar features `hour` (0-23), `weekday` (Monday = 0) and `month` (1-12), plain integers in the data's fixed UTC+1 time.
 - Dropping `HtTot == 0` also removes legitimate summer hours when heating is off. If the model later fails in summer, revisit this rule first.
