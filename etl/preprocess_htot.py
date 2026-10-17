@@ -1,0 +1,115 @@
+"""Silver and gold layers for predicting HtTot from weather (COFACTOR-SBHUB Oslo).
+
+Decisions are tracked in notebooks/quality_inspect_decision.md. Run from the project root:
+
+    uv run python -m etl.preprocess_htot
+"""
+from pathlib import Path
+
+import numpy as np
+import pandas as pd
+
+RAW = Path("datasets/COFACTOR-SBHUB-Oslo/Dataset_buildings_csv_files")
+SILVER = Path("data/silver")
+GOLD = Path("data/gold")
+
+BUILDINGS = [8105, 8107, 8116]
+TARGET = "HtTot"
+WEATHER = ["Tout", "SolGlob", "WindSpd", "WindDir"]
+COLUMNS = [TARGET, *WEATHER]               # raw columns kept in silver
+WIND_COMPONENTS = ["WindDir_sin", "WindDir_cos"]  # gold replaces the angle WindDir by these
+GOLD_WEATHER = ["Tout", "SolGlob", "WindSpd", *WIND_COMPONENTS]
+
+TOUT_SENTINEL = -100     # Tout below this (-273.15 in the data) is a missing-value marker
+MAX_INTERP_HOURS = 3     # weather gaps longer than this stay empty
+FLAT_MIN_RUN = 6         # HtTot runs of identical values (> 0) at least this long are dropped
+SUMMER_MONTHS = (6, 7, 8)  # HtTot == 0 is real here (heating off), so these rows are kept; use () to drop zeros all year
+TZ = "Etc/GMT-1"        # fixed UTC+1 all year, no DST
+
+
+def read_building(building_id: int) -> pd.DataFrame:
+    """Read one raw file: parse the metadata block, then the data rows."""
+    path = RAW / f"export_{building_id}.txt"
+    meta = {}
+    with open(path, encoding="utf-8", errors="replace") as f:
+        header_line = int(f.readline().strip().split(";")[1])
+        for _ in range(2, header_line):
+            line = f.readline().strip()
+            if ";" in line:
+                k, v = line.split(";", 1)
+                meta[k] = v.rstrip(";")
+    df = pd.read_csv(path, sep=";", skiprows=header_line - 1, usecols=["TimeStamp", *COLUMNS])
+    df["timestamp"] = pd.to_datetime(df.pop("TimeStamp").str[:19]).dt.tz_localize(TZ)
+    df = df.set_index("timestamp").sort_index()
+    df = df[~df.index.duplicated(keep="first")]
+    df.attrs["meta"] = meta
+    return df
+
+
+def to_silver(df: pd.DataFrame, building_id: int) -> pd.DataFrame:
+    """Typed, unified schema on a complete hourly grid. Gaps stay as NaN, nothing is filled."""
+    df = df.astype("float64").reindex(pd.date_range(df.index.min(), df.index.max(), freq="h"))
+    df.index.name = "timestamp"
+    df.loc[df["Tout"] < TOUT_SENTINEL, "Tout"] = pd.NA
+    df["SolGlob"] = df["SolGlob"].clip(lower=0)
+    meta = df.attrs.get("meta", {})
+    df.insert(0, "building_id", building_id)
+    df["floor_area"] = float(meta["floor_area"])
+    df["year_of_construction"] = int(meta["year_of_construction"])
+    return df
+
+
+def short_gap_interpolate(s: pd.Series, max_hours: int) -> pd.Series:
+    """Linearly fill NaN gaps of at most max_hours. Longer gaps are left entirely empty."""
+    filled = s.interpolate(limit_area="inside")
+    gap_id = s.notna().cumsum()
+    gap_len = s.isna().groupby(gap_id).transform("sum")
+    return s.where(~(s.isna() & (gap_len <= max_hours)), filled)
+
+
+def flat_run_mask(s: pd.Series, min_run: int) -> pd.Series:
+    """True for every hour that belongs to a run of >= min_run identical values above zero."""
+    run_id = s.ne(s.shift()).cumsum()
+    run_len = s.groupby(run_id).transform("size")
+    return s.gt(0) & (run_len >= min_run)
+
+
+def to_gold(silver: pd.DataFrame) -> pd.DataFrame:
+    """Model-ready rows: short weather gaps interpolated, bad/empty HtTot rows dropped, calendar features added.
+
+    The wind direction angle is replaced by its sine and cosine, so 359 and 1 degrees are neighbours.
+    Splitting into train/validation/test is done in etl/windows.py.
+    """
+    g = silver.copy()
+    angle = np.deg2rad(g.pop("WindDir"))
+    g["WindDir_sin"], g["WindDir_cos"] = np.sin(angle), np.cos(angle)
+    for col in GOLD_WEATHER:
+        g[col] = short_gap_interpolate(g[col], MAX_INTERP_HOURS)
+
+    zero = g[TARGET].eq(0) & ~g.index.month.isin(SUMMER_MONTHS)
+    g.loc[zero | flat_run_mask(g[TARGET], FLAT_MIN_RUN), TARGET] = pd.NA
+    g = g.dropna(subset=[TARGET, *GOLD_WEATHER])
+
+    # calendar features, in the fixed UTC+1 time of the data (no DST shift)
+    g["hour"] = g.index.hour
+    g["weekday"] = g.index.dayofweek  # Monday = 0
+    g["month"] = g.index.month
+    return g
+
+
+def main() -> None:
+    SILVER.mkdir(parents=True, exist_ok=True)
+    GOLD.mkdir(parents=True, exist_ok=True)
+    gold_parts = []
+    for bid in BUILDINGS:
+        silver = to_silver(read_building(bid), bid)
+        silver.to_parquet(SILVER / f"building_{bid}.parquet")
+        gold = to_gold(silver)
+        gold_parts.append(gold)
+        print(f"{bid}: silver {len(silver)} rows -> gold {len(gold)} rows "
+              f"({gold.index.min().date()} to {gold.index.max().date()})")
+    pd.concat(gold_parts).to_parquet(GOLD / "htot_oslo.parquet")
+
+
+if __name__ == "__main__":
+    main()

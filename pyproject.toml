@@ -5,5 +5,19 @@ description = "Digital twin of a school classroom heating system (PAI700)"
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
+    "lightgbm>=4.7.0",
+    "pandas>=3.0.6",
+    "pyarrow>=26.0.0",
     "pyyaml>=6.0",
+    "scikit-learn>=1.9.1",
 ]
+
+[dependency-groups]
+dev = [
+    "ipykernel>=7.4.0",
+    "pytest>=9.1.1",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
