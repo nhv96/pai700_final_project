@@ -12,4 +12,8 @@ This file is to keep track of each decision made for selecting dataset to train 
 
 - 2026-10-15: implemented in `etl/preprocess_htot.py`. Silver (`data/silver/building_<id>.parquet`) keeps all hours on a full hourly grid with only the sentinel and negative-solar fixes. Gold (`data/gold/htot_oslo.parquet`) applies the gap rules above and adds a `split` column.
 - 2026-10-15: gold also has calendar features `hour` (0-23), `weekday` (Monday = 0) and `month` (1-12), plain integers in the data's fixed UTC+1 time.
+- 2026-10-17: `SolGlob == 0` rows are kept. Zero is a real value (no sun) in about 28% of rows, mostly evening, night and early morning. Dropping them would remove those hours and break the hourly windows.
+- 2026-10-17: modelling plan. Horizons 1 h, 6 h and 24 h. Inputs: past `HtTot`, weather, calendar, `year_of_construction`. Future weather comes from measured values (a "perfect forecast" replay), so setups can be compared on equal terms. Real forecast errors are not included, so scores are an upper bound for deployment.
+- 2026-10-17: validation uses a rolling-origin (expanding window) split, never random. Features are scaled with statistics fitted on the training part only. Metrics: MAE and RMSE in kWh (`HtTot` is Wh per hour, divide by 1000) and WAPE (sum of absolute errors / sum of actuals), compared with a seasonal-naive baseline.
+- 2026-10-17: the number of `HtTot` files is 37 (33 Oslo + 4 Drammen), none empty. The earlier count of 38 was wrong.
 - Dropping `HtTot == 0` also removes legitimate summer hours when heating is off. If the model later fails in summer, revisit this rule first.
