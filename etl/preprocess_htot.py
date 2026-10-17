@@ -6,6 +6,7 @@ Decisions are tracked in notebooks/quality_inspect_decision.md. Run from the pro
 """
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
 
 RAW = Path("datasets/COFACTOR-SBHUB-Oslo/Dataset_buildings_csv_files")
@@ -15,12 +16,14 @@ GOLD = Path("data/gold")
 BUILDINGS = [8105, 8107, 8116]
 TARGET = "HtTot"
 WEATHER = ["Tout", "SolGlob", "WindSpd", "WindDir"]
-COLUMNS = [TARGET, *WEATHER]
+COLUMNS = [TARGET, *WEATHER]               # raw columns kept in silver
+WIND_COMPONENTS = ["WindDir_sin", "WindDir_cos"]  # gold replaces the angle WindDir by these
+GOLD_WEATHER = ["Tout", "SolGlob", "WindSpd", *WIND_COMPONENTS]
 
 TOUT_SENTINEL = -100     # Tout below this (-273.15 in the data) is a missing-value marker
 MAX_INTERP_HOURS = 3     # weather gaps longer than this stay empty
 FLAT_MIN_RUN = 6         # HtTot runs of identical values (> 0) at least this long are dropped
-SPLIT = (0.70, 0.15, 0.15)  # train / validation / test, chronological, per building
+SUMMER_MONTHS = (6, 7, 8)  # HtTot == 0 is real here (heating off), so these rows are kept; use () to drop zeros all year
 TZ = "Etc/GMT-1"        # fixed UTC+1 all year, no DST
 
 
@@ -72,22 +75,25 @@ def flat_run_mask(s: pd.Series, min_run: int) -> pd.Series:
 
 
 def to_gold(silver: pd.DataFrame) -> pd.DataFrame:
-    """Model-ready rows: short weather gaps interpolated, bad/empty HtTot rows dropped, calendar features and split added."""
+    """Model-ready rows: short weather gaps interpolated, bad/empty HtTot rows dropped, calendar features added.
+
+    The wind direction angle is replaced by its sine and cosine, so 359 and 1 degrees are neighbours.
+    Splitting into train/validation/test is done in etl/windows.py.
+    """
     g = silver.copy()
-    for col in WEATHER:
+    angle = np.deg2rad(g.pop("WindDir"))
+    g["WindDir_sin"], g["WindDir_cos"] = np.sin(angle), np.cos(angle)
+    for col in GOLD_WEATHER:
         g[col] = short_gap_interpolate(g[col], MAX_INTERP_HOURS)
-    g.loc[g[TARGET].eq(0) | flat_run_mask(g[TARGET], FLAT_MIN_RUN), TARGET] = pd.NA
-    g = g.dropna(subset=COLUMNS)
+
+    zero = g[TARGET].eq(0) & ~g.index.month.isin(SUMMER_MONTHS)
+    g.loc[zero | flat_run_mask(g[TARGET], FLAT_MIN_RUN), TARGET] = pd.NA
+    g = g.dropna(subset=[TARGET, *GOLD_WEATHER])
 
     # calendar features, in the fixed UTC+1 time of the data (no DST shift)
     g["hour"] = g.index.hour
     g["weekday"] = g.index.dayofweek  # Monday = 0
     g["month"] = g.index.month
-
-    n = len(g)
-    n_train, n_val = int(n * SPLIT[0]), int(n * SPLIT[1])
-    split = ["train"] * n_train + ["val"] * n_val + ["test"] * (n - n_train - n_val)
-    g["split"] = split
     return g
 
 
@@ -100,9 +106,8 @@ def main() -> None:
         silver.to_parquet(SILVER / f"building_{bid}.parquet")
         gold = to_gold(silver)
         gold_parts.append(gold)
-        counts = gold["split"].value_counts().to_dict()
         print(f"{bid}: silver {len(silver)} rows -> gold {len(gold)} rows "
-              f"({gold.index.min().date()} to {gold.index.max().date()}) {counts}")
+              f"({gold.index.min().date()} to {gold.index.max().date()})")
     pd.concat(gold_parts).to_parquet(GOLD / "htot_oslo.parquet")
 
 
