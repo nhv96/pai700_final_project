@@ -34,3 +34,20 @@ def test_features_unchanged_without_time():
     extra = flat_features(hist, future, 6, t)
     assert list(extra.columns[:len(plain.columns)]) == list(plain.columns)
     assert extra.shape[1] == plain.shape[1] + 9
+
+
+def test_trend_features_on_a_ramp():
+    n, h = 3, 6
+    L = 168
+    hist = np.zeros((n, L, 9), dtype=np.float32)
+    hist[:, :, 0] = np.arange(L)                     # HtTot rises 1 per hour
+    hist[:, :, 1] = 10.0                             # Tout constant
+    future = np.zeros((n, h, 8), dtype=np.float32)
+    future[:, :, 0] = 4.0                            # Tout will be 4
+    X = flat_features(hist, future, h, trends=True)
+    assert (X["y_diff1"] == 1).all() and (X["y_diff24"] == 24).all() and np.allclose(X["y_slope6"], 1)
+    assert (X["Tout_fut_change"] == -6).all() and np.allclose(X["hdd_fut_mean"], 11) and np.allclose(X["hdd24"], 5)
+    # target hour is L-1+6; same hour on earlier days sits at 24k back, so the typical level is the mean of those
+    pos = [L - 1 + h - 24 * k for k in range(1, 8)]
+    assert np.allclose(X["y_target_hod_mean"], np.mean(pos))
+    assert np.allclose(X["y_dev_now"], (L - 1) - np.mean([L - 1 - 24 * k for k in range(7)]))
