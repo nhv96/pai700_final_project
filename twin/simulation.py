@@ -9,6 +9,7 @@ One step (``dt = step_seconds``, 60 s by default):
 
 from __future__ import annotations
 
+import copy
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 
@@ -19,7 +20,7 @@ from .radiator import Radiator
 from .schedule import OccupancySchedule
 from .sensors import IdealSensors
 from .stub_model import StubHeatModel
-from .ventilation import ventilation_flow_L_s
+from .ventilation import ahu_step, ventilation_flow_L_s
 from .weather import SyntheticWeather, Weather
 
 
@@ -37,6 +38,8 @@ class Record:
     q_radiator_W: float
     q_internal_W: float
     ventilation_flow_L_s: float
+    t_supply_air_C: float  # air entering the room, after heat recovery and AHU coil
+    q_coil_W: float  # AHU heating coil power (ventilation energy)
 
 
 class DigitalTwin:
@@ -87,6 +90,13 @@ class DigitalTwin:
             action.ventilation_on,
             self.state.t_air_C,
         )
+        ahu = ahu_step(
+            p.ventilation,
+            flow,
+            sample.t_outdoor_C,
+            self.state.t_air_C,
+            p.comfort.setpoint_C if action.air_supply_target_C is None else action.air_supply_target_C,
+        )
         q_int = self.internal_gains_W(occupants)
 
         inputs = StepInputs(
@@ -96,7 +106,7 @@ class DigitalTwin:
             q_internal_W=q_int,
             q_radiator_W=q_rad,
             ventilation_flow_L_s=flow,
-            supply_air_temp_C=sample.t_outdoor_C,
+            supply_air_temp_C=ahu.t_supply_C,
             heat_recovery_eff=p.ventilation.heat_recovery_eff,
         )
         self.state = self.model.step(self.state, inputs, self.dt_s)
@@ -112,9 +122,25 @@ class DigitalTwin:
             q_radiator_W=q_rad,
             q_internal_W=q_int,
             ventilation_flow_L_s=flow,
+            t_supply_air_C=ahu.t_supply_C,
+            q_coil_W=ahu.q_coil_W,
         )
         self.time += timedelta(seconds=self.dt_s)
         return rec
+
+    def preview(self, controller: Controller, duration: timedelta) -> list[Record]:
+        """Run a COPY of the twin ahead with ``controller``; this twin is not changed.
+
+        Lets a predictive controller ask "what happens if I do X?". The copy shares the
+        true weather, schedule, room model and parameters, so the answer is a perfect
+        forecast from a perfect model: an upper bound on what any real forecast can do.
+        """
+        live, self.controller = self.controller, controller
+        try:
+            clone = copy.deepcopy(self)
+        finally:
+            self.controller = live
+        return clone.run(duration)
 
     def run(self, duration: timedelta) -> list[Record]:
         n = int(duration.total_seconds() // self.dt_s)
@@ -127,9 +153,10 @@ def build_default_twin(
     weather: Weather | None = None,
     controller: Controller | None = None,
     initial_t_air_C: float = 21.0,
+    params: TwinParams | None = None,
 ) -> DigitalTwin:
-    """Default wiring: params.yaml, stub heat model, synthetic weather, legacy controller."""
-    params = load_params()
+    """Default wiring: params.yaml (or ``params``), stub heat model, synthetic weather, legacy controller."""
+    params = params or load_params()
     return DigitalTwin(
         params=params,
         model=model or StubHeatModel(),

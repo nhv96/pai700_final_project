@@ -41,7 +41,12 @@ uv run pytest                      # tests
 
 ```bash
 uv run python -m twin              # 2 simulated school days -> out/run.csv
+uv run python -m scenarios.overshoot   # cold-morning overshoot scenario -> out/overshoot.png + .csv
+uv run python -m scenarios.compare_controllers   # legacy vs forecast pre-heating -> out/controller_comparison.png
+uv run python -m scenarios.compare_ventilation      # legacy vs room-compensated supply air -> out/ventilation_comparison.png
 ```
+
+The heat model is our own two-node room model (`twin/room_model.py`: fast air node, slow wall node). The air-handling unit (`ventilation.ahu_step`) applies heat recovery and a heating coil up to the room setpoint, so `supply_air_temp_C` is the air entering the room and the coil energy is logged as `q_coil_W`. All room parameters are assumed, not calibrated. If `uv run` picks system packages, see `docs/pythonpath-note.md`.
 
 Parameters live in `config/params.yaml` (confidence level per value, see `docs/parameters.md`).
 

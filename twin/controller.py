@@ -25,6 +25,8 @@ class ControlAction:
     valve_cmd: float  # 0..1, TRV opening
     t_supply_C: float  # radiator supply temperature from the substation
     ventilation_on: bool
+    # Air temperature the AHU coil heats the supply air to. None = the room setpoint.
+    air_supply_target_C: float | None = None
 
 
 class Controller(Protocol):

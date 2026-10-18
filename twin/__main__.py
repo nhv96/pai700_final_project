@@ -1,5 +1,5 @@
-"""Smoke run: ``uv run python -m twin`` simulates 2 school days with the placeholder
-1R1C model, writes out/run.csv and prints a short summary."""
+"""Smoke run: ``uv run python -m twin`` simulates 2 school days with the two-node room
+model, writes out/run.csv and prints a short summary."""
 
 from __future__ import annotations
 
@@ -9,7 +9,7 @@ from datetime import timedelta
 from pathlib import Path
 
 from .params import load_params
-from .placeholder_model import OneR1CPlaceholder
+from .room_model import TwoNodeRoomModel
 from .simulation import Record, build_default_twin
 
 SETPOINT_C = 21.0
@@ -19,7 +19,7 @@ DISCOMFORT_ABOVE_C = 26.0
 def main() -> None:
     params = load_params()
     twin = build_default_twin(
-        model=OneR1CPlaceholder.from_params(params),
+        model=TwoNodeRoomModel.from_params(params),
         initial_t_air_C=19.0,  # below setpoint so the radiator path runs
     )
     records = twin.run(timedelta(days=2))
@@ -38,7 +38,7 @@ def main() -> None:
     above_setpoint = sum(1 for r in records if r.t_air_C > SETPOINT_C)
     above_discomfort = sum(1 for r in records if r.t_air_C > DISCOMFORT_ABOVE_C)
 
-    print(f"model: {type(twin.model).__name__} (THROWAWAY placeholder)")
+    print(f"model: {type(twin.model).__name__}")
     print(f"steps: {len(records)} (dt={twin.dt_s:.0f} s)")
     print(f"radiator heat delivered: {heat_kWh:.1f} kWh")
     print(f"peak t_air: {peak.t_air_C:.2f} C at {peak.time:%a %H:%M}")

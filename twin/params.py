@@ -43,6 +43,7 @@ class ZoneParams:
     ceiling_height_m: float
     window_area_m2: float
     window_orientation: str
+    window_g_value: float = 0.6  # solar heat-gain fraction of the glazing (params.yaml solar:)
 
     @property
     def volume_m3(self) -> float:
@@ -143,6 +144,7 @@ def params_from_dict(raw: dict[str, Any]) -> TwinParams:
             ceiling_height_m=float(_val(zone["ceiling_height_m"])),
             window_area_m2=float(_val(zone["window_area_m2"])),
             window_orientation=str(_val(zone["window_orientation"])),
+            window_g_value=float(_val(raw["solar"]["window_g_value"])),
         ),
         occupancy=OccupancyParams(
             pupils=int(_val(occ["pupils_per_class"])),
