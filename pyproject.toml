@@ -11,6 +11,7 @@ dependencies = [
     "pyarrow>=26.0.0",
     "pyyaml>=6.0",
     "scikit-learn>=1.9.1",
+    "torch>=2.14.1",
 ]
 
 [dependency-groups]
@@ -23,3 +24,11 @@ dev = [
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["."]
+
+[tool.uv.sources]
+torch = { index = "pytorch-cpu" }
+
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true
