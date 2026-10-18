@@ -16,6 +16,8 @@ The research solution has three parts that work together. This repository now co
 
 How they fit together: the dataset is the common ground. The AI model learns from it, the DT replays the same weather, and the dashboard shows what both produce.
 
+All three parts use the same **frozen data window** (`frozen/`, Oslo buildings 8105, 8107, 8116, 2022-09-24 to 2023-03-31: a 7-day warm-up plus a replay from 2022-10-01, a held-out part of the AI model's test block) and read it through the **replay feed** (`feed/`), which plays it like IoT sensors, hourly. Each part keeps its own clock. See `feed/README.md`.
+
 ## Data
 
 - **COFACTOR-SBHUB Oslo**: 48 Oslo schools, hourly, CC BY 4.0, SINTEF. DOI 10.60609/2hvr-wc82. Cite Lien et al. 2025, Data in Brief 63, 112288.
@@ -57,6 +59,18 @@ head out/run.csv
 uv run python -m etl.preprocess_htot   # raw -> data/silver/*.parquet -> data/gold/htot_oslo.parquet
 ```
 
+### Frozen window and replay feed
+
+Own `pyproject.toml` and Dockerfile; details in `feed/README.md`.
+
+```bash
+cd feed && uv sync
+uv run python -m feed.freeze                 # silver -> frozen/oslo_window_v1.parquet + .sha256 (already done; immutable)
+uv run python -m feed.freeze verify
+FEED_DATA=../frozen/oslo_window_v1.parquet uv run uvicorn --factory feed.api:create_app --port 8001
+# or: docker build -t pai700-feed feed && docker run --rm -p 8001:8001 -v "$PWD/frozen:/data:ro" pai700-feed
+```
+
 ### AI model
 
 ```bash
@@ -83,6 +97,8 @@ A full `run_gbm` takes about 40 minutes. If `uv run` picks up the wrong packages
 | `twin/sensors.py` | ideal sensors |
 | `twin/controller.py` | `Controller` protocol, legacy timer + thermostat baseline |
 | `twin/simulation.py` | `DigitalTwin` 60 s loop, `build_default_twin()` |
+| `feed/` | frozen-window freeze command and HTTP replay service (own project, own Dockerfile) |
+| `frozen/` | the frozen dataset window + SHA-256 checksum |
 | `etl/preprocess_htot.py` | silver and gold layers from the raw files |
 | `etl/windows.py` | time splits and forecasting windows |
 | `modeling/` | baselines, metrics, LightGBM (`gbm.py`), tuning, day types, features |
