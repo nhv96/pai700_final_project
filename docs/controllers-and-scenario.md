@@ -91,6 +91,30 @@ Supply-temp control brings the saving and the lower peak; forecast heating bring
 
 Outputs: `out/sensitivity.csv`, `out/sensitivity.png`.
 
+## The same controllers on real Oslo weather
+
+`twin_service/` runs the legacy and the combined controller on hourly weather from the replay feed (building 8105, 5 school days from every second Monday, sun converted to the south facade with the assumed ratio 1.5, room starts at 17 °C, same room parameters). Weather is real; the room, the parameters and the forecast (perfect) are not.
+
+| Week from | Mean outdoor °C | Legacy heat kWh | Combined heat kWh | Combined vs legacy | Peak legacy / combined °C | Lesson min below 20 °C, legacy / combined | Minutes at purge limit, legacy |
+|---|---|---|---|---|---|---|---|
+| 2022-11-07 | 9.1 | 120.1 | 118.1 | -1.6 % | 23.4 / 22.5 | 104 / 6 | 0 |
+| 2022-11-21 | 1.3 | 207.5 | 216.8 | +4.5 % | 21.8 / 21.9 | 139 / 18 | 0 |
+| 2022-12-05 | -3.6 | 264.9 | 276.9 | +4.5 % | 21.7 / 21.9 | 270 / 19 | 0 |
+| 2022-12-19 | 0.2 | 220.7 | 230.4 | +4.4 % | 21.7 / 21.9 | 160 / 19 | 0 |
+| 2023-01-02 | -4.2 | 275.4 | 288.3 | +4.7 % | 21.4 / 21.6 | 395 / 20 | 0 |
+| 2023-01-16 | 0.3 | 214.4 | 223.3 | +4.2 % | 22.1 / 22.1 | 139 / 18 | 0 |
+| 2023-01-30 | -0.5 | 214.4 | 221.6 | +3.4 % | 22.4 / 22.3 | 123 / 16 | 0 |
+| 2023-02-13 | 3.0 | 173.5 | 175.0 | +0.8 % | 23.1 / 22.7 | 98 / 14 | 0 |
+| 2023-02-27 | 3.0 | 182.9 | 147.9 | **-19.2 %** | 25.1 / 24.2 | 85 / 12 | 2017 |
+| 2023-03-13 | 0.4 | 206.9 | 183.8 | **-11.2 %** | 25.6 / 24.9 | 118 / 17 | 1344 |
+
+What it shows:
+
+- **Mid-winter: no overshoot to remove.** In November to mid-February the simulated room never reaches the 24 °C purge limit, so supply-temperature control has nothing to save. The combined controller uses 1 to 5 % **more** heat, because forecast pre-heating starts earlier to keep the first lesson warm. It cuts cold lesson minutes from 100 to 400 down to about 20 per week. Here it buys comfort, not savings.
+- **Late winter and early spring: overshoot appears and the saving with it.** From late February the sun is strong enough to push the legacy room to 25 °C with 1300 to 2000 purge minutes, and the combined controller saves 11 to 19 % of the heat.
+- This matches the sensitivity analysis: the saving depends on how much the room overshoots, and that depends on sun and weather.
+- Caveat on the sun: the ratio 1.5 is one fixed assumed number for all months. Winter sun is lower than spring sun, so the true ratio is higher in December and lower in March than 1.5 and the table would shift.
+
 ## Limits
 
 - Perfect forecast and perfect model: this is a best case. A real controller would do less well.

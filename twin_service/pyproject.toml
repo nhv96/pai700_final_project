@@ -1,0 +1,21 @@
+[project]
+name = "pai700-twin-service"
+version = "0.1.0"
+description = "HTTP service that runs the digital twin on replay-feed weather (PAI700)"
+requires-python = ">=3.13"
+dependencies = [
+    "fastapi>=0.143.5",
+    "httpx>=0.28.1",
+    "pyyaml>=6.0",
+    "uvicorn>=0.54.0",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=9.1.1",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+# "." for twin_service, ".." for the shared twin/ package and config/ at the repository root
+pythonpath = [".", ".."]

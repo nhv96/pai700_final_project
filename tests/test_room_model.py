@@ -188,7 +188,7 @@ def test_supply_control_saves_heat_and_keeps_comfort():
 # --- combined controller and parameter plumbing --------------------------------------
 from dataclasses import replace
 
-from scenarios.compare_combined import make_controllers
+from twin.controller_set import make_controllers
 
 
 def test_build_default_twin_uses_the_params_it_is_given():

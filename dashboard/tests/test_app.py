@@ -67,3 +67,30 @@ def test_forecast_status(tmp_path):
 def test_serves_page():
     r = make().get("/")
     assert r.status_code == 200 and "<title>" in r.text
+
+
+def test_twin_compare_is_forwarded():
+    def twin(request: httpx.Request) -> httpx.Response:
+        assert request.url.path == "/compare"
+        return httpx.Response(200, json={"q": str(request.url.query, "utf-8")})
+    c = TestClient(create_app("http://feed", transport=httpx.MockTransport(fake_feed),
+                              twin_url="http://twin", twin_transport=httpx.MockTransport(twin)))
+    r = c.get("/api/twin/compare", params={"start": "2022-11-07", "days": 3})
+    assert r.status_code == 200 and "days=3" in r.json()["q"]
+
+
+def test_twin_down_gives_502():
+    def down(request):
+        raise httpx.ConnectError("refused")
+    c = TestClient(create_app("http://feed", transport=httpx.MockTransport(fake_feed),
+                              twin_url="http://twin", twin_transport=httpx.MockTransport(down)))
+    assert c.get("/api/twin/compare").status_code == 502
+
+
+def test_twin_errors_pass_through():
+    def bad(request):
+        return httpx.Response(422, json={"detail": "outside the window"})
+    c = TestClient(create_app("http://feed", transport=httpx.MockTransport(fake_feed),
+                              twin_url="http://twin", twin_transport=httpx.MockTransport(bad)))
+    r = c.get("/api/twin/compare", params={"start": "2000-01-01"})
+    assert r.status_code == 422 and r.json()["detail"] == "outside the window"

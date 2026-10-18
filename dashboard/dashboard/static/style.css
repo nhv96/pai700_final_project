@@ -12,6 +12,9 @@
   --heat: #2a78d6;   /* categorical slot 1 */
   --tout: #eb6834;   /* categorical slot 2 */
   --accent: #2a78d6;
+  --legacy: #8a8984;   /* neutral: the reference */
+  --combined: #2a78d6;
+  --limit: #eb6834;
 }
 @media (prefers-color-scheme: dark) {
   :root {
@@ -27,6 +30,9 @@
     --heat: #3987e5;
     --tout: #d95926;
     --accent: #3987e5;
+    --legacy: #a3a29c;
+    --combined: #3987e5;
+    --limit: #d95926;
   }
 }
 
@@ -102,3 +108,12 @@ svg text { fill: var(--muted); font-size: 12px; font-family: inherit; }
 
 .table-view { margin-top: 12px; }
 .table-view summary { cursor: pointer; color: var(--ink-2); }
+
+.warn { margin: 0 0 12px; padding: 8px 10px; border: 1px solid var(--border); border-left: 3px solid var(--limit); border-radius: 6px; color: var(--ink-2); font-size: 14px; }
+.twin-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-bottom: 12px; }
+.twin-controls label { color: var(--ink-2); font-size: 14px; display: inline-flex; align-items: center; gap: 6px; }
+input[type="date"] { font: inherit; color: var(--ink); background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 4px 8px; }
+#chart-twin-temp { height: 240px; }
+#chart-twin-heat { height: 170px; }
+.dashed { fill: none; stroke-width: 1; stroke-dasharray: 4 4; }
+svg text.label { font-weight: 600; }

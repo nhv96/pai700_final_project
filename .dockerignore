@@ -12,3 +12,17 @@ claude/
 *.md
 Dockerfile
 .dockerignore
+**/.venv
+**/__pycache__
+datasets/
+data/
+results/
+frozen/
+notebooks/
+heat-model/
+feed/
+dashboard/
+modeling/
+etl/
+tests/
+scenarios/

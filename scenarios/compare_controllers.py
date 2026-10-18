@@ -10,37 +10,15 @@ room model, so the result is a best case (see twin/predictive_controller.py).
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 from pathlib import Path
 
-from scenarios.overshoot import run, summarise, write_csv
+from scenarios.overshoot import run, write_csv
 from scenarios.plot import plot_comparison
+from twin.metrics import Totals, totals  # noqa: F401  (re-exported for the scenarios)
 from twin.params import load_params
 from twin.predictive_controller import ForecastController
 
 DAYS = 5  # Monday to Friday
-
-
-@dataclass(frozen=True)
-class Totals:
-    radiator_kWh: float
-    coil_kWh: float
-    peak_t_air_C: float
-    minutes_above_purge: int
-    occupied_minutes_below_lower_limit: int
-    energy_while_above_setpoint_kWh: float
-
-
-def totals(records, params) -> Totals:
-    days = summarise(records, params)
-    return Totals(
-        radiator_kWh=round(sum(d.radiator_kWh for d in days), 2),
-        coil_kWh=round(sum(d.coil_kWh for d in days), 2),
-        peak_t_air_C=max(d.peak_t_air_C for d in days),
-        minutes_above_purge=sum(d.minutes_above_purge for d in days),
-        occupied_minutes_below_lower_limit=sum(d.occupied_minutes_below_lower_limit for d in days),
-        energy_while_above_setpoint_kWh=round(sum(d.energy_while_above_setpoint_kWh for d in days), 2),
-    )
 
 
 def main() -> None:

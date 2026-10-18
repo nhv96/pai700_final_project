@@ -82,7 +82,43 @@
         </table>
       </details>
     </section>
+
+    <section class="card" aria-labelledby="twin-h">
+      <h2 id="twin-h">Digital twin: simulated classroom</h2>
+      <p class="warn">Simulation, not measurement. One 60 m² classroom with assumed parameters, run on the weather of the selected building. Not the building's real heat use.</p>
+      <div class="twin-controls">
+        <label>Start (Monday)
+          <input id="twin-start" type="date">
+        </label>
+        <label>Days
+          <select id="twin-days">
+            <option value="1">1</option>
+            <option value="3">3</option>
+            <option value="5" selected>5</option>
+            <option value="7">7</option>
+          </select>
+        </label>
+        <button id="twin-run" type="button" class="primary">Run simulation</button>
+        <span id="twin-message" class="message" role="status"></span>
+      </div>
+      <div id="twin-out" hidden>
+        <div class="table-wrap">
+          <table id="twin-summary">
+            <thead><tr><th scope="col">5-day totals</th><th scope="col" class="num">Legacy</th><th scope="col" class="num">Combined</th></tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+        <h2 class="second">Room temperature</h2>
+        <p class="muted unit">°C, 10-minute values</p>
+        <svg id="chart-twin-temp" role="img" aria-label="Simulated room temperature, legacy and combined controller"></svg>
+        <h2 class="second">Heat power (radiator + ventilation coil)</h2>
+        <p class="muted unit">kW, 10-minute values</p>
+        <svg id="chart-twin-heat" role="img" aria-label="Simulated heat power, legacy and combined controller"></svg>
+        <p id="twin-note" class="hint"></p>
+      </div>
+    </section>
   </main>
   <script src="app.js"></script>
+  <script src="twin.js"></script>
 </body>
 </html>

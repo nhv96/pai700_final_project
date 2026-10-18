@@ -14,27 +14,8 @@ from pathlib import Path
 from scenarios.compare_controllers import DAYS, totals
 from scenarios.overshoot import run
 from scenarios.plot import plot_comparison
-from twin.controller import LegacyController
-from twin.params import TwinParams, load_params
-from twin.predictive_controller import ForecastController
-from twin.supply_controller import SupplyTempController
-
-MIN_SUPPLY_C = 16.0
-
-
-def make_controllers(
-    params: TwinParams, min_supply_C: float = MIN_SUPPLY_C, supply_gain: float = 2.0, **forecast_kw
-):
-    """Fresh controllers (they hold state) for the four cases."""
-    h, c, o = params.heating, params.comfort, params.occupancy
-    return {
-        "legacy": LegacyController(h, c),
-        "forecast heating": ForecastController(h, c, o, **forecast_kw),
-        "supply temp": SupplyTempController(LegacyController(h, c), c, min_supply_C=min_supply_C, gain_per_K=supply_gain),
-        "combined": SupplyTempController(
-            ForecastController(h, c, o, **forecast_kw), c, min_supply_C=min_supply_C, gain_per_K=supply_gain
-        ),
-    }
+from twin.controller_set import make_controllers
+from twin.params import load_params
 
 
 def main() -> None:

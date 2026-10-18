@@ -18,7 +18,7 @@ from dataclasses import dataclass, field, replace
 from datetime import timedelta
 from pathlib import Path
 
-from scenarios.compare_combined import make_controllers
+from twin.controller_set import make_controllers
 from scenarios.compare_controllers import DAYS, totals
 from scenarios.overshoot import run
 from twin.params import TwinParams, load_params

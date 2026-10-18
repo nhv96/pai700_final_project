@@ -10,9 +10,9 @@ The research solution has three parts that work together. This repository now co
 
 | Part | What it is | Status |
 |---|---|---|
-| **Digital twin (DT)** | A simulation of one school classroom (heating and ventilation) with a 60 s step. It gives us a safe place to test control ideas without touching a real building. | Simulation loop, radiator, ventilation, sensors, schedule and baseline controller exist (`twin/`). The heat model is still a **placeholder**; the real heat model is next. |
+| **Digital twin (DT)** | A simulation of one school classroom (heating and ventilation) with a 60 s step. It gives us a safe place to test control ideas without touching a real building. | Simulation loop, radiator, ventilation with air-handling unit, sensors, schedule, our own two-node heat model (assumed parameters), the legacy controller and two better controllers exist (`twin/`). It runs on feed weather as a service (`twin_service/`). |
 | **AI model** | Predicts near-future heat load (`HtTot`, hourly) from past heat, weather and calendar. Meant to plug into the DT and feed the controller. | Working: ETL, baselines, LightGBM, tuning (`etl/`, `modeling/`). |
-| **Building-management dashboard** | One central place to see the buildings, their state, the AI forecasts and the DT results. | First version works (`dashboard/`): replay controls, buildings table, heat and outdoor-temperature charts. AI forecast overlay, status colours and the twin comparison are not built yet. |
+| **Building-management dashboard** | One central place to see the buildings, their state, the AI forecasts and the DT results. | First version works (`dashboard/`): replay controls, buildings table, heat and outdoor-temperature charts, and a digital-twin panel (legacy vs combined controller, simulated). AI forecast overlay and status colours are not built yet. |
 
 How they fit together: the dataset is the common ground. The AI model learns from it, the DT replays the same weather, and the dashboard shows what both produce.
 
@@ -62,6 +62,16 @@ mkdir -p out && docker run --rm -v "$PWD/out:/app/out" --user "$(id -u):$(id -g)
 head out/run.csv
 ```
 
+### Twin service
+
+Runs the twin on the replay feed's weather (own `pyproject.toml` and Dockerfile; details in `twin_service/README.md`).
+
+```bash
+docker compose up --build            # feed :8001, twin :8002, dashboard http://localhost:8000
+```
+
+Limits of the Oslo data for the heat model: `docs/oslo-data-limits.md`. Results on real Oslo weather: `docs/controllers-and-scenario.md`.
+
 ### Data pipeline (ETL)
 
 ```bash
@@ -85,7 +95,7 @@ FEED_DATA=../frozen/oslo_window_v1.parquet uv run uvicorn --factory feed.api:cre
 Own `pyproject.toml` and Dockerfile; details in `dashboard/README.md`. It only talks to the replay feed over HTTP.
 
 ```bash
-docker compose up --build            # feed on :8001 + dashboard on http://localhost:8000
+docker compose up --build            # feed on :8001, twin service on :8002, dashboard on http://localhost:8000
 ```
 
 ### AI model
@@ -105,7 +115,11 @@ A full `run_gbm` takes about 40 minutes. If `uv run` picks up the wrong packages
 | Path | Role |
 |---|---|
 | `twin/interface.py` | `StepInputs`, `ZoneState`, `HeatModel` protocol (contract with the heat-model owner) |
-| `twin/stub_model.py`, `twin/placeholder_model.py` | placeholder heat models (no real physics yet) |
+| `twin/stub_model.py`, `twin/placeholder_model.py` | placeholder heat models (kept for tests) |
+| `twin/room_model.py` | our two-node heat model |
+| `twin/feed_weather.py` | weather from replay-feed rows (sun converted to the south facade) |
+| `twin/controller_set.py`, `twin/metrics.py` | the standard controllers and the result metrics |
+| `twin_service/` | HTTP service that runs the twin on feed weather (own project and Dockerfile) |
 | `twin/params.py` | typed loader for `config/params.yaml` |
 | `twin/schedule.py` | occupancy schedule, plant timer windows |
 | `twin/weather.py` | `Weather` protocol, constant and synthetic sources (SMHI loader later) |
@@ -129,13 +143,13 @@ A full `run_gbm` takes about 40 minutes. If `uv run` picks up the wrong packages
 
 ## Plugging in the real heat model
 
-Implement `step(state, inputs, dt_s) -> ZoneState` (see `twin/interface.py`) and pass it as `model=` to `build_default_twin()`.
+The twin already runs our own `TwoNodeRoomModel`. Another model only has to implement `step(state, inputs, dt_s) -> ZoneState` (see `twin/interface.py`) and be passed as `model=` to `build_default_twin()`.
 
 ## Next steps
 
-1. Build the real heat model for the classroom and plug it into the DT.
+1. Calibrate the heat model with indoor temperature and plant data from the client (see `docs/oslo-data-limits.md`).
 2. Connect the AI forecast to the DT controller (optimal start/stop).
-3. Grow the dashboard: AI forecast overlay (when the model output exists), status colours, and the twin comparison.
+3. Grow the dashboard: AI forecast overlay (when the model output exists) and status colours.
 
 ## Results so far (AI model)
 

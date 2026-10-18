@@ -67,6 +67,7 @@ internal_gains:
 
 solar:
   radiation_source: {value: "SMHI STRANG (candidate)", confidence: unknown, note: "NOT verified in this research. Alternative: Open-Meteo. Resolve before coding the weather loader"}
+  horizontal_to_south_facade_ratio: {typical: 1.5, min: 1.0, max: 2.2, confidence: assumed, source: "engineering rule of thumb for Nordic latitudes, Oct-Mar average, NOT verified", note: "dataset SolGlob is sun on a HORIZONTAL surface; the room model needs sun on the south facade. One fixed ratio is crude: low winter sun gives a higher ratio than autumn or spring. Used only when weather comes from the replay feed"}
   window_g_value: {typical: 0.6, min: 0.4, max: 0.7, confidence: assumed, source: "typical double glazing, engineering default"}
 
 ventilation:

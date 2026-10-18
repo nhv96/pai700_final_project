@@ -13,7 +13,9 @@ Replay controls (play, pause, restart, speed), the simulated clock (data time, U
 
 The page owns its clock. Pause closes the stream; play opens it again from the last hour received.
 
-Not built yet: the AI forecast overlay (the checkbox is disabled; `/api/forecast/status` already tells whether a forecasts file is set with `DASHBOARD_FORECASTS`), status colours, and the digital-twin comparison.
+The **digital-twin panel** (`static/twin.js`) asks the twin service for a simulated classroom week on the selected building's weather: legacy against combined controller, a totals table, room temperature and heat power charts. It is labelled as a simulation. The server forwards `/api/twin/compare` to the twin service (`TWIN_URL`, default `http://localhost:8002`).
+
+Not built yet: the AI forecast overlay (the checkbox is disabled; `/api/forecast/status` already tells whether a forecasts file is set with `DASHBOARD_FORECASTS`), and status colours.
 
 ## Run
 
@@ -29,7 +31,7 @@ On its own (the feed must be running, see `../feed/README.md`):
 ```bash
 cd dashboard
 uv sync
-FEED_URL=http://localhost:8001 uv run uvicorn --factory dashboard.app:create_app --port 8000
+FEED_URL=http://localhost:8001 TWIN_URL=http://localhost:8002 uv run uvicorn --factory dashboard.app:create_app --port 8000
 ```
 
 or `docker build -t pai700-dashboard dashboard && docker run --rm -p 8000:8000 -e FEED_URL=http://host.docker.internal:8001 --add-host host.docker.internal:host-gateway pai700-dashboard`.
