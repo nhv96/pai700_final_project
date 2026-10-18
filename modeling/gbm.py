@@ -54,7 +54,7 @@ class HorizonData:
 
 
 def load_horizon(gold: pd.DataFrame, horizon: int, test_start: pd.Timestamp, daytypes: bool = False,
-                 trends: bool = False) -> HorizonData:
+                 trends: bool | tuple = False) -> HorizonData:
     parts = []
     for bid, b in gold.groupby("building_id"):
         origins = w.targets_in(w.valid_origins(b.index, horizon), horizon, None, test_start)
@@ -121,7 +121,7 @@ def run_fold(d: HorizonData, fold: w.Fold, scheme: str, target: str, held_out=No
 
 
 def run_all(gold: pd.DataFrame, horizons=w.HORIZONS, schemes=SCHEMES, targets=TARGETS, params=None,
-            stop_days: int | None = None, daytypes: bool = False, trends: bool = False, log=print) -> pd.DataFrame:
+            stop_days: int | None = None, daytypes: bool = False, trends: bool | tuple = False, log=print) -> pd.DataFrame:
     folds, t0 = w.make_folds(gold.index)
     out = []
     for h in horizons:
