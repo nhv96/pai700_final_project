@@ -44,7 +44,11 @@ uv run python -m twin              # 2 simulated school days -> out/run.csv
 uv run python -m scenarios.overshoot   # cold-morning overshoot scenario -> out/overshoot.png + .csv
 uv run python -m scenarios.compare_controllers   # legacy vs forecast pre-heating -> out/controller_comparison.png
 uv run python -m scenarios.compare_ventilation      # legacy vs room-compensated supply air -> out/ventilation_comparison.png
+uv run python -m scenarios.compare_combined         # legacy vs forecast + supply-temp combined -> out/combined_comparison.png
+uv run python -m scenarios.sensitivity              # 26 one-at-a-time cases, about 100 s -> out/sensitivity.png + .csv
 ```
+
+How the scenario and the controllers work: `docs/controllers-and-scenario.md`.
 
 The heat model is our own two-node room model (`twin/room_model.py`: fast air node, slow wall node). The air-handling unit (`ventilation.ahu_step`) applies heat recovery and a heating coil up to the room setpoint, so `supply_air_temp_C` is the air entering the room and the coil energy is logged as `q_coil_W`. All room parameters are assumed, not calibrated. If `uv run` picks system packages, see `docs/pythonpath-note.md`.
 
