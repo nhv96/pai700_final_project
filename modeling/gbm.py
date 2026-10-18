@@ -53,12 +53,13 @@ class HorizonData:
     buildings: list = field(default_factory=list)
 
 
-def load_horizon(gold: pd.DataFrame, horizon: int, test_start: pd.Timestamp) -> HorizonData:
+def load_horizon(gold: pd.DataFrame, horizon: int, test_start: pd.Timestamp, daytypes: bool = False) -> HorizonData:
     parts = []
     for bid, b in gold.groupby("building_id"):
         origins = w.targets_in(w.valid_origins(b.index, horizon), horizon, None, test_start)
         hist, future, y = w.build_arrays(b, origins, horizon)
-        parts.append((bid, origins + pd.Timedelta(hours=horizon), flat_features(hist, future, horizon),
+        target_time = origins + pd.Timedelta(hours=horizon)
+        parts.append((bid, target_time, flat_features(hist, future, horizon, target_time if daytypes else None),
                       y, hist[:, :, w.HISTORY_FEATURES.index(w.TARGET)].copy()))
     return HorizonData(
         horizon=horizon,
@@ -119,11 +120,11 @@ def run_fold(d: HorizonData, fold: w.Fold, scheme: str, target: str, held_out=No
 
 
 def run_all(gold: pd.DataFrame, horizons=w.HORIZONS, schemes=SCHEMES, targets=TARGETS, params=None,
-            stop_days: int | None = None, log=print) -> pd.DataFrame:
+            stop_days: int | None = None, daytypes: bool = False, log=print) -> pd.DataFrame:
     folds, t0 = w.make_folds(gold.index)
     out = []
     for h in horizons:
-        d = load_horizon(gold, h, t0)
+        d = load_horizon(gold, h, t0, daytypes)
         log(f"horizon {h}: {len(d.y)} windows")
         for fold in folds:
             for target in targets:

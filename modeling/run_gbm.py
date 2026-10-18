@@ -14,10 +14,11 @@ def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--gold", default="data/gold/htot_oslo.parquet")
     ap.add_argument("--out", default="results/gbm")
+    ap.add_argument("--daytypes", action="store_true", help="add holiday and school-break features")
     args = ap.parse_args()
 
     gold = pd.read_parquet(args.gold)
-    preds = gbm.run_all(gold)
+    preds = gbm.run_all(gold, daytypes=args.daytypes)
     out = Path(args.out)
     out.mkdir(parents=True, exist_ok=True)
     preds.to_parquet(out / "predictions.parquet")

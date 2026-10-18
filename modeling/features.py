@@ -9,6 +9,7 @@ import pandas as pd
 
 from etl import windows as w
 from modeling import baselines as bl
+from modeling.daytypes import daytype_features
 
 RECENT_HOURS = 24                  # every one of the last 24 hours of HtTot is a feature
 EXTRA_LAGS = (48, 72, 96, 120, 144, 167)    # hours back from the origin, for the days before
@@ -18,8 +19,12 @@ _H = {name: i for i, name in enumerate(w.HISTORY_FEATURES)}
 _F = {name: i for i, name in enumerate(w.FUTURE_FEATURES)}
 
 
-def flat_features(hist: np.ndarray, future: np.ndarray, horizon: int) -> pd.DataFrame:
-    """hist (n, lookback, F_hist) and future (n, horizon, F_future) as one table of float32 columns."""
+def flat_features(hist: np.ndarray, future: np.ndarray, horizon: int,
+                  target_time: pd.DatetimeIndex | None = None) -> pd.DataFrame:
+    """hist (n, lookback, F_hist) and future (n, horizon, F_future) as one table of float32 columns.
+
+    With target_time (the target hour of each window), holiday and school-break flags are added.
+    """
     lookback = hist.shape[1]
     y = hist[:, :, _H[w.TARGET]]
     cols = {}
@@ -44,4 +49,7 @@ def flat_features(hist: np.ndarray, future: np.ndarray, horizon: int) -> pd.Data
 
     for name in w.CALENDAR:                                   # calendar of the target hour
         cols[f"{name}_target"] = future[:, -1, _F[name]]
-    return pd.DataFrame(cols).astype(np.float32)
+    out = pd.DataFrame(cols).astype(np.float32)
+    if target_time is not None:
+        out = pd.concat([out, daytype_features(target_time)], axis=1)
+    return out
