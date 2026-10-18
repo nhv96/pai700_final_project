@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Building Heat Monitor</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="top">
+    <div>
+      <h1>Building heat monitor</h1>
+      <p class="sub">Replay of measured district-heating use. Times are UTC+1 all year.</p>
+    </div>
+    <div class="clock" aria-live="off">
+      <div id="clock-time" class="clock-time">–</div>
+      <div><span id="clock-phase" class="badge">Not started</span> <span id="clock-progress" class="muted"></span></div>
+    </div>
+  </header>
+
+  <section class="filters" aria-label="Replay controls and view">
+    <button id="play" type="button" class="primary">Play</button>
+    <button id="reset" type="button">Restart</button>
+    <label>Speed
+      <select id="speed">
+        <option value="1">1 hour / s</option>
+        <option value="6">6 hours / s</option>
+        <option value="24" selected>1 day / s</option>
+        <option value="72">3 days / s</option>
+        <option value="168">1 week / s</option>
+      </select>
+    </label>
+    <label>Chart range
+      <select id="range">
+        <option value="7">Last 7 days</option>
+        <option value="30">Last 30 days</option>
+        <option value="all" selected>Whole window</option>
+      </select>
+    </label>
+    <label class="forecast" title="Waiting for the AI model's forecasts">
+      <input id="forecast" type="checkbox" disabled> AI forecast
+    </label>
+    <span id="message" class="message" role="status"></span>
+  </section>
+
+  <main>
+    <section class="card" aria-labelledby="buildings-h">
+      <h2 id="buildings-h">Buildings</h2>
+      <div class="table-wrap">
+        <table id="buildings">
+          <thead>
+            <tr>
+              <th scope="col">Building</th>
+              <th scope="col" class="num">Floor area (m²)</th>
+              <th scope="col" class="num">Heat now (kW)</th>
+              <th scope="col" class="num">Last 24 h (kWh)</th>
+              <th scope="col" class="num">Last 24 h (kWh/m²)</th>
+              <th scope="col" class="num">Outdoor (°C)</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+      <p class="hint">Select a building to see its charts.</p>
+    </section>
+
+    <section class="card" aria-labelledby="chart-h">
+      <div class="charts" id="charts">
+        <h2 id="chart-h">Heat use, <span id="chart-building">–</span></h2>
+        <p class="muted unit">kW, hourly average</p>
+        <svg id="chart-heat" role="img" aria-label="Heat use over time"></svg>
+        <h2 class="second">Outdoor temperature</h2>
+        <p class="muted unit">°C</p>
+        <svg id="chart-tout" role="img" aria-label="Outdoor temperature over time"></svg>
+        <div id="tooltip" class="tooltip" hidden></div>
+      </div>
+      <details class="table-view">
+        <summary>Show the last 24 hours as a table</summary>
+        <table id="recent">
+          <thead><tr><th scope="col">Time</th><th scope="col" class="num">Heat (kW)</th><th scope="col" class="num">Outdoor (°C)</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </details>
+    </section>
+  </main>
+  <script src="app.js"></script>
+</body>
+</html>

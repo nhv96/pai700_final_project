@@ -12,7 +12,7 @@ The research solution has three parts that work together. This repository now co
 |---|---|---|
 | **Digital twin (DT)** | A simulation of one school classroom (heating and ventilation) with a 60 s step. It gives us a safe place to test control ideas without touching a real building. | Simulation loop, radiator, ventilation, sensors, schedule and baseline controller exist (`twin/`). The heat model is still a **placeholder**; the real heat model is next. |
 | **AI model** | Predicts near-future heat load (`HtTot`, hourly) from past heat, weather and calendar. Meant to plug into the DT and feed the controller. | Working: ETL, baselines, LightGBM, tuning (`etl/`, `modeling/`). |
-| **Building-management dashboard** | One central place to see the buildings, their state, the AI forecasts and the DT results. | Not started. Design is the next discussion. |
+| **Building-management dashboard** | One central place to see the buildings, their state, the AI forecasts and the DT results. | First version works (`dashboard/`): replay controls, buildings table, heat and outdoor-temperature charts. AI forecast overlay, status colours and the twin comparison are not built yet. |
 
 How they fit together: the dataset is the common ground. The AI model learns from it, the DT replays the same weather, and the dashboard shows what both produce.
 
@@ -71,6 +71,14 @@ FEED_DATA=../frozen/oslo_window_v1.parquet uv run uvicorn --factory feed.api:cre
 # or: docker build -t pai700-feed feed && docker run --rm -p 8001:8001 -v "$PWD/frozen:/data:ro" pai700-feed
 ```
 
+### Dashboard
+
+Own `pyproject.toml` and Dockerfile; details in `dashboard/README.md`. It only talks to the replay feed over HTTP.
+
+```bash
+docker compose up --build            # feed on :8001 + dashboard on http://localhost:8000
+```
+
 ### AI model
 
 ```bash
@@ -99,6 +107,8 @@ A full `run_gbm` takes about 40 minutes. If `uv run` picks up the wrong packages
 | `twin/simulation.py` | `DigitalTwin` 60 s loop, `build_default_twin()` |
 | `feed/` | frozen-window freeze command and HTTP replay service (own project, own Dockerfile) |
 | `frozen/` | the frozen dataset window + SHA-256 checksum |
+| `dashboard/` | building-heat dashboard: small FastAPI server + plain HTML/JS page (own project, own Dockerfile) |
+| `docker-compose.yml` | runs the feed and the dashboard together |
 | `etl/preprocess_htot.py` | silver and gold layers from the raw files |
 | `etl/windows.py` | time splits and forecasting windows |
 | `modeling/` | baselines, metrics, LightGBM (`gbm.py`), tuning, day types, features |
@@ -116,7 +126,7 @@ Implement `step(state, inputs, dt_s) -> ZoneState` (see `twin/interface.py`) and
 
 1. Build the real heat model for the classroom and plug it into the DT.
 2. Connect the AI forecast to the DT controller (optimal start/stop).
-3. Design and build the centralized building-management dashboard.
+3. Grow the dashboard: AI forecast overlay (when the model output exists), status colours, and the twin comparison.
 
 ## Results so far (AI model)
 

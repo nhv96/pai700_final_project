@@ -1,0 +1,19 @@
+[project]
+name = "pai700-dashboard"
+version = "0.1.0"
+description = "Lightweight building-heat dashboard for the client's staff (PAI700)"
+requires-python = ">=3.13"
+dependencies = [
+    "fastapi>=0.143.5",
+    "httpx>=0.28.1",
+    "uvicorn>=0.54.0",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=9.1.1",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]

@@ -1,0 +1,16 @@
+# Runs the replay feed and the dashboard together. Each part also runs on its own (see feed/ and dashboard/ READMEs).
+services:
+  feed:
+    build: feed
+    volumes:
+      - ./frozen:/data:ro          # the frozen window; the feed refuses a file that fails its checksum
+    ports:
+      - "8001:8001"
+  dashboard:
+    build: dashboard
+    environment:
+      FEED_URL: http://feed:8001
+    ports:
+      - "8000:8000"
+    depends_on:
+      - feed
