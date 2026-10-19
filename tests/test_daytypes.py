@@ -54,11 +54,12 @@ def test_trend_features_on_a_ramp():
 
 
 def test_trend_groups_can_be_left_out():
-    from modeling.features import TREND_GROUPS
+    from modeling.features import DEFAULT_TREND_GROUPS, TREND_GROUPS
     hist = np.random.default_rng(0).random((3, 168, 9)).astype(np.float32)
     future = np.random.default_rng(1).random((3, 6, 8)).astype(np.float32)
     full = flat_features(hist, future, 6, trends=True)
-    assert set(full.columns) == set(flat_features(hist, future, 6, trends=TREND_GROUPS).columns)
-    less = flat_features(hist, future, 6, trends=tuple(g for g in TREND_GROUPS if g != "accumulated_cold"))
+    assert set(full.columns) == set(flat_features(hist, future, 6, trends=DEFAULT_TREND_GROUPS).columns)
+    assert set(flat_features(hist, future, 6, trends=TREND_GROUPS).columns) - set(full.columns) >= {"SolGlob_sum24"}
+    less = flat_features(hist, future, 6, trends=tuple(g for g in DEFAULT_TREND_GROUPS if g != "accumulated_cold"))
     gone = set(full.columns) - set(less.columns)
     assert gone == {"Tout_mean72", "Tout_mean168", "hdd24", "hdd72", "hdd168", "hdd_fut_mean"}

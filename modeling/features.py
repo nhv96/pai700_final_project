@@ -25,6 +25,7 @@ DAYS_BACK = 7                      # days used for the "same hour of day" averag
 
 
 TREND_GROUPS = ("consumption_change", "level_vs_normal", "temp_change", "accumulated_cold", "sun_wind")
+DEFAULT_TREND_GROUPS = tuple(g for g in TREND_GROUPS if g != "sun_wind")    # the ablation showed sun_wind adds nothing
 
 
 def trend_features(hist: np.ndarray, future: np.ndarray, horizon: int, groups=TREND_GROUPS) -> dict:
@@ -79,7 +80,7 @@ def flat_features(hist: np.ndarray, future: np.ndarray, horizon: int,
     """hist (n, lookback, F_hist) and future (n, horizon, F_future) as one table of float32 columns.
 
     With target_time (the target hour of each window), holiday and school-break flags are added.
-    With trends=True, all groups of change and accumulation features (trend_features) are added;
+    With trends=True, the DEFAULT_TREND_GROUPS of change and accumulation features (trend_features) are added;
     a tuple of TREND_GROUPS names adds only those.
     """
     lookback = hist.shape[1]
@@ -107,7 +108,7 @@ def flat_features(hist: np.ndarray, future: np.ndarray, horizon: int,
     for name in w.CALENDAR:                                   # calendar of the target hour
         cols[f"{name}_target"] = future[:, -1, _F[name]]
     if trends:
-        cols.update(trend_features(hist, future, horizon, TREND_GROUPS if trends is True else trends))
+        cols.update(trend_features(hist, future, horizon, DEFAULT_TREND_GROUPS if trends is True else trends))
     out = pd.DataFrame(cols).astype(np.float32)
     if target_time is not None:
         out = pd.concat([out, daytype_features(target_time)], axis=1)

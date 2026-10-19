@@ -8,7 +8,7 @@ from pathlib import Path
 import pandas as pd
 
 from modeling import gbm, metrics
-from modeling.features import TREND_GROUPS
+from modeling.features import DEFAULT_TREND_GROUPS, TREND_GROUPS
 
 
 def main() -> None:
@@ -17,10 +17,10 @@ def main() -> None:
     ap.add_argument("--out", default="results/gbm")
     ap.add_argument("--daytypes", action="store_true", help="add holiday and school-break features")
     ap.add_argument("--trends", action="store_true", help="add change and accumulation features")
-    ap.add_argument("--drop-trend-group", choices=TREND_GROUPS, help="with --trends: leave this group out (ablation)")
+    ap.add_argument("--drop-trend-group", choices=DEFAULT_TREND_GROUPS, help="with --trends: leave this group out (ablation)")
     ap.add_argument("--targets", nargs="+", choices=gbm.TARGETS, default=list(gbm.TARGETS))
     args = ap.parse_args()
-    trends = tuple(g for g in TREND_GROUPS if g != args.drop_trend_group) if args.trends else False
+    trends = tuple(g for g in DEFAULT_TREND_GROUPS if g != args.drop_trend_group) if args.trends else False
 
     gold = pd.read_parquet(args.gold)
     preds = gbm.run_all(gold, daytypes=args.daytypes, trends=trends, targets=args.targets)
