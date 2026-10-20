@@ -11,7 +11,7 @@ The research solution has three parts that work together. This repository now co
 | Part | What it is | Status |
 |---|---|---|
 | **Digital twin (DT)** | A simulation of one school classroom (heating and ventilation) with a 60 s step. It gives us a safe place to test control ideas without touching a real building. | Simulation loop, radiator, ventilation with air-handling unit, sensors, schedule, our own two-node heat model (assumed parameters), the legacy controller and two better controllers exist (`twin/`). It runs on feed weather as a service (`twin_service/`). |
-| **AI model** | Predicts near-future heat load (`HtTot`, hourly, whole building) from past heat, weather and calendar. | Working: ETL, baselines, LightGBM, GRU, final test, saved models and a forecast service (`etl/`, `modeling/`, `models/`, `forecast_service/`). The twin's controllers do not use it yet; the dashboard shows it. |
+| **AI model** | Predicts near-future heat load (`HtTot`, hourly, whole building) from past heat, weather and calendar. | Working: ETL, baselines, LightGBM, GRU, final test, saved models and a forecast service (`etl/`, `modeling/`, `models/`, `forecast_service/`). The twin's controllers do not use it (decision: benchmark only); the dashboard shows it, also scaled to 60 m² next to the twin run. |
 | **Building-management dashboard** | One central place to see the buildings, their state, the AI forecasts and the DT results. | First version works (`dashboard/`): replay controls, buildings table, heat and outdoor-temperature charts, and a digital-twin panel (legacy vs combined controller, simulated). The AI forecast overlay works (dashed line, from the forecast service). Status colours are not built yet. |
 
 How they fit together: the dataset is the common ground. The AI model learns from it, the DT replays the same weather, and the dashboard shows what both produce.
@@ -166,9 +166,9 @@ The twin already runs our own `TwoNodeRoomModel`. Another model only has to impl
 ## Next steps
 
 1. Calibrate the heat model with indoor temperature and plant data from the client (see `docs/oslo-data-limits.md`).
-2. Connect the AI forecast to the DT controller (optimal start/stop).
+2. (Decided 2026-10-20) The AI forecast is a benchmark only; the twin's controllers do not use it. Not planned: connecting it to optimal start/stop.
 3. Grow the dashboard: status colours, and the forecast for the next hours beyond the replay clock.
-4. Let the twin's controllers use a heat-load forecast (needs a rule that maps a whole-building load to the classroom; not defined yet).
+4. Optional: check what `HtTot` contains for each building (hot water share) to judge the benchmark better.
 
 ## Results so far (AI model)
 

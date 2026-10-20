@@ -52,6 +52,7 @@ def test_compare_returns_both_runs_and_a_warning(client):
     assert set(leg["series"]) == {"time", "t_air_C", "radiator_kW", "coil_kW", "supply_air_C"}
     assert len(body["weather"]["t_outdoor_C"]) == len(leg["series"]["time"])
     assert "Simulation" in body["note"] and body["south_facade_ratio"] == 1.5
+    assert body["room_floor_area_m2"] == 60
     # the combined controller never uses more heat than twice legacy; sanity, not a claim
     assert comb["summary"]["heat_kWh"] > 0
 

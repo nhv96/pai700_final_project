@@ -17,6 +17,8 @@ The **digital-twin panel** (`static/twin.js`) asks the twin service for a simula
 
 The **AI forecast overlay**: tick "AI forecast made [1 / 6 / 24 h] before" and the heat chart gets a dashed line with what the model predicted for each hour that long before it. The forecasts come from the forecast service (`FORECAST_URL`, default `http://localhost:8003`; the box stays disabled while the service is unreachable). Only hours the replay has already reached are drawn, and each forecast used data up to its own origin only. A note under the chart says the forecast is for the whole building and uses the perfect weather forecast. The server forwards `/api/forecast/series` and `/api/forecast/model`; `/api/forecast/status` reports whether the service answers.
 
+The **AI benchmark in the twin card**: after a simulation the heat-power chart gets a dashed line with the 24 h forecast for the whole building scaled to the room (room m² / building m²), and the table gets the same total in kWh. It is a rough reference only: the building number includes hot water and an average square metre, and no controller reads it. The note under the chart says this. If the forecast service is down or does not cover the period, the card says so and the rest still works.
+
 Not built yet: status colours, and the forecast for the hours after the replay clock.
 
 ## Run

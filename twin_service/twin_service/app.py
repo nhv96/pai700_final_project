@@ -82,6 +82,7 @@ def create_app(feed_url: str | None = None, transport: httpx.BaseTransport | Non
                 cache[key] = {
                     "start": f"{t0:%Y-%m-%d}", "days": days, "building": building,
                     "south_facade_ratio": params.zone.south_facade_ratio,
+                    "room_floor_area_m2": params.zone.floor_area_m2,
                     **compare(weather, params, t0, days),
                 }
         return cache[key]

@@ -11,7 +11,7 @@ Everything it returns is **simulated** with assumed room parameters. The combine
 | Endpoint | Returns |
 |---|---|
 | `GET /health` | `{"status": "ok"}` |
-| `GET /compare?start=2022-11-07&days=5&building=8105` | summary and 10-minute series for `legacy` and `combined`, the weather used, setpoint and purge limit, a `note`. `start` is a date (midnight), `days` 1 to 14, `building` defaults to the first. The run must lie inside the data window. |
+| `GET /compare?start=2022-11-07&days=5&building=8105` | summary and 10-minute series for `legacy` and `combined`, the weather used, `room_floor_area_m2`, setpoint and purge limit, a `note`. `start` is a date (midnight), `days` 1 to 14, `building` defaults to the first. The run must lie inside the data window. |
 
 The room starts at 17 °C (school at setback), as in `scenarios/overshoot.py`. Results are cached per (start, days, building). A first 5-day run takes about 2 seconds.
 
