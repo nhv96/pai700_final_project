@@ -14,7 +14,7 @@ Trollhättan Stad asked us to find out, before any investment, whether AI-assist
 
 The AI model was trained and tested on eleven years of hourly data from three Oslo schools. On a test period it never saw, it forecasts the heat use of a whole building with an error of about 9 % (1 hour ahead) to 13 % (6 and 24 hours ahead). That is half to two thirds less error than a simple "same hour yesterday" guess. This number is an upper bound, because the test used measured weather as a perfect weather forecast.
 
-In the simulated classroom, the improved controller (forecast pre-heating plus room-compensated supply-air temperature) cut heat by 21 % in the base case and by 11 to 19 % in sunny late-winter weeks on real Oslo weather. In the cold and dark weeks of November to mid-February it saved nothing and used up to 4.7 % more heat in exchange for fewer cold lessons. Over the ten sampled winter weeks the net difference was zero. **We therefore do not claim an annual saving.** We claim that a saving is plausible in the weeks when sun and people overheat the room, that its size is between 0 and about 20 % of classroom heat, and that proving it needs indoor temperature and plant data from a real building. The cost equivalent of a saving is the saved kWh multiplied by the district-heating price; the price is not in our data and has to be confirmed with Kraftstaden (section 12).
+In the simulated classroom, the improved controller (forecast pre-heating plus room-compensated supply-air temperature) cut heat by 21 % in the base case and by 11 to 19 % in sunny late-winter weeks on real Oslo weather. In the cold and dark weeks of November to mid-February it saved nothing and used up to 4.7 % more heat in exchange for fewer cold lessons. Over the ten sampled winter weeks the net difference was zero. **We therefore do not claim an annual saving.** We claim that a saving is plausible in the weeks when sun and people overheat the room, that its size is between 0 and about 20 % of classroom heat, and that proving it needs indoor temperature and plant data from a real building. The cost equivalent is the saved kWh times the district-heating price. With the 1.10 to 1.35 SEK per kWh from our background check, a sunny week saves about 25 to 47 SEK per classroom and each 1 % of a school's yearly heat is worth about 6,000 to 16,000 SEK. The price has to be confirmed with Kraftstaden, and the investment cost is not estimated, because it needs facts from the client that we could not obtain (section 12).
 
 ---
 
@@ -67,7 +67,7 @@ Group 10, Master in AI and Automation, University West.
 
 **[Check the split and the names.]** 
 
-The three parts were developed as separate programs that talk to each other over HTTP, so each member could work on their own part without breaking the others. They share one frozen data window (section 6.3), which means they can be compared at the same timestamps.
+The three parts were developed as separate programs that talk to each other over HTTP, so each member could work on their own part without breaking the others. They share one frozen data window (section 6.4), which means they can be compared at the same timestamps.
 
 ---
 
@@ -120,7 +120,13 @@ The AI model forecasts demand; the twin tests control. We decided that the AI fo
 
 We use the **COFACTOR-SBHUB Oslo** dataset: hourly data from 48 Oslo schools, published by SINTEF under the licence CC BY 4.0 (DOI 10.60609/2hvr-wc82; Lien et al. 2025, Data in Brief 63, 112288). We chose it because we needed building heat data over several years, openly available. A similar Drammen set was dropped.
 
-### 6.2 What we used
+### 6.2 Earlier data: SMHI weather
+
+At the start of the project we used weather data from **SMHI** (the Swedish Meteorological and Hydrological Institute, open data, CC BY 4.0; hourly observations, with the weather station at Trollhättan–Vänersborg Airport as the nearest to the client). It was used to build and try out the **heat model** of the room: it gave realistic outdoor temperature and sun to drive the model while the room equations and parameters were being set up.
+
+SMHI provides weather only. It has **no heat use**, so it could not be used to train the AI model, which needs heat use as its target. For that reason we moved to the Oslo dataset above. The SMHI work was still valuable, because it let the team develop and check the heat model on real Swedish weather before the heat data arrived. **[Mary: please check the wording and add which SMHI parameters and period were used.]**
+
+### 6.3 What we used
 
 Three Oslo schools with a long history and few gaps: buildings **8105** (8,415 m², built 2011), **8107** (6,063 m², 1982) and **8116** (13,408 m², 1959). The period is 2012-10-01 to 2023-10-22, about 90,000 hourly rows per building after cleaning.
 
@@ -136,7 +142,7 @@ Time is fixed at UTC+1 all year, with no daylight saving.
 
 **What the data cannot give us:** indoor temperature, occupancy, valve position, supply temperature, and a split of `HtTot` into radiators, ventilation and hot water. This limits what can be validated (section 13).
 
-### 6.3 Cleaning and the frozen window
+### 6.4 Cleaning and the frozen window
 
 The cleaning rules were chosen after a quality scan and each decision is recorded in `notebooks/quality_inspect_decision.md`:
 
@@ -371,21 +377,40 @@ We cannot give an annual percentage. The Oslo window ends on 31 March, so April 
 ### 12.3 Cost equivalent
 
 ```
-saving in SEK = saved heat (kWh) × district-heating price (SEK per kWh)
+saving in SEK = saved heat (kWh) × variable district-heating price (SEK per kWh)
 ```
 
-The proposal and our data do not contain the price Kraftstaden pays. **We have not assumed one.**
+**Price used.** From our early background check on district-heating cost (`report/investigate-on-cost.md`) we use the variable energy charge of **1.10 to 1.35 SEK per kWh** (1,100 to 1,350 SEK per MWh). The fixed annual grid fee (1,500 to 4,500 SEK a year in that note) does not change with the amount of heat used, so it is not part of the saving.
 
-| Case | Saved heat per classroom | Cost saving **[price P in SEK per kWh, to be confirmed]** |
-|---|---|---|
-| Sunny week, 27 February (−19.2 %) | 35.0 kWh | 35.0 × P |
-| Sunny week, 13 March (−11.2 %) | 23.1 kWh | 23.1 × P |
-| Mid-winter weeks | up to 12.9 kWh more heat per week | up to 12.9 × P extra cost |
-| Ten sampled weeks, net | −1.4 kWh | about 0 |
+This price is for orientation only. The background note gives no source or year, its figures are for homes and not for municipal buildings, and its seasonal example (about 0.09 USD per kWh in winter) is lower than its own range. **[Confirm the real price and tariff with Kraftstaden before submission.]**
 
-To scale to the portfolio, multiply by the number of comparable classrooms **[number to be provided by Kraftstaden]**. For one overshoot week the saving is about 23 to 35 kWh per classroom, so at P = 1 SEK/kWh it would be 23 to 35 SEK per classroom per week; this is an arithmetic example only, not a price estimate.
+**Per classroom, from the simulation (real Oslo weather, 5 school days):**
 
-**[Investment cost: not yet estimated. Needs a price for sensors, a gateway and installation, and the hours for integration with the building-management system. The proposal asks for this under "investment costs".]**
+| Case | Heat change | At 1.10 SEK/kWh | At 1.35 SEK/kWh |
+|---|---|---|---|
+| Sunny week from 27 February | −35.0 kWh (−19.2 %) | 38.5 SEK saved | 47.3 SEK saved |
+| Sunny week from 13 March | −23.1 kWh (−11.2 %) | 25.4 SEK saved | 31.2 SEK saved |
+| Cold mid-winter week, worst case (from 2 January) | +12.9 kWh (+4.7 %) | 14.2 SEK extra | 17.4 SEK extra |
+| Ten sampled weeks, net | +1.4 kWh (+0.1 %) | 1.5 SEK extra | 1.9 SEK extra |
+| For comparison: legacy heat in the ten weeks | 2,080.7 kWh | 2,289 SEK | 2,809 SEK |
+
+So for one classroom, a sunny overshoot week is worth about 25 to 47 SEK, and the ten sampled weeks together are worth about nothing. These are small amounts per room; any real value comes from many rooms and from the weeks in spring and autumn that the replay window does not cover.
+
+**Per building, as a sensitivity (not a result).** We did not simulate whole buildings, so we cannot say what percentage a school would save. What we can say is what **each 1 % reduction** of a building's heat is worth. The yearly heat of the three Oslo schools, from October 2022 to September 2023, is below (space heating plus hot water; it is a little low because 2 to 5 % of the hours are missing in the cleaned data).
+
+| Building | Floor area | Heat, Oct 2022 to Sep 2023 | Per m² | Value of 1 % at 1.10 SEK/kWh | at 1.35 SEK/kWh |
+|---|---|---|---|---|---|
+| 8105 | 8,415 m² | 642 MWh | 76 kWh/m² | 7,060 SEK | 8,670 SEK |
+| 8107 | 6,063 m² | 551 MWh | 91 kWh/m² | 6,060 SEK | 7,440 SEK |
+| 8116 | 13,408 m² | 1,164 MWh | 87 kWh/m² | 12,800 SEK | 15,710 SEK |
+
+Our estimate of 0 to about 20 % applies to one classroom's heating and ventilation on school days, so it cannot be applied directly to these building totals (they include hot water, corridors, offices and weekends). As a rough reading, if the saving reached the building level at even 5 %, the value would be 5 times the figures above, about 30,000 to 80,000 SEK a year for a school of this size; this is an arithmetic example and not a forecast.
+
+To scale to the portfolio, multiply by the number of comparable schools or classrooms **[to be provided by Kraftstaden]**.
+
+**Investment cost: a gap in this study.** We did not estimate the investment cost, and we do not give a payback time. The cost depends on facts that only the client can supply and that we could not reach: which building-management system and controls the schools have, whether the valves and ventilation units can be controlled from outside, how many sensors and which gateway are needed, who does the installation, and what the client pays for integration work. Without these, any figure would be a guess. The proposal lists "investment costs" as one of the points to assess, so this is a limit of the pre-study and is named as such in section 13.
+
+What a follow-up would need to provide: an inventory of the control systems in one or two pilot schools, quotes for cheap sensors and a gateway, and an estimate of the hours for integration. With that and the price of heat above, a simple payback time can be calculated.
 
 ---
 
@@ -399,7 +424,8 @@ To scale to the portfolio, multiply by the number of comparable classrooms **[nu
 6. **Benchmark gap.** The scaled AI benchmark is about 48 to 66 % of the simulated classroom's heat. Expected reasons are the south window, the missing hot water in the room, and assumed parameters, but this is not proven.
 7. **Data gaps** in building 8107 and in September 2019 and 2021; the school-break rule is approximate.
 8. **Training variation.** The GRU is not bit-for-bit repeatable and was tried with one setting and one seed.
-9. **Integration complexity.** Real buildings need access to the valve and ventilation controls, which older systems often lack.
+9. **Investment cost not estimated.** We could not reach the client for the facts it needs, so the pre-study gives expected savings but no payback time (section 12.3).
+10. **Integration complexity.** Real buildings need access to the valve and ventilation controls, which older systems often lack.
 
 ---
 
@@ -423,7 +449,7 @@ To scale to the portfolio, multiply by the number of comparable classrooms **[nu
 **What the client should do next**
 
 1. Provide indoor temperature, valve position, supply and return temperature and the ventilation timer for one room or building, even for a few weeks. This allows calibration of the wall and infiltration parameters and a test of the overshoot claim.
-2. Provide the district-heating price and a count of comparable classrooms for the cost estimate.
+2. Provide the real district-heating price and tariff, a count of comparable classrooms, and the facts needed for an investment cost (control systems in a pilot school, sensors, gateway, installation and integration work). Without them no payback time can be stated.
 3. Run the twin on Trollhättan weather for a whole year, including spring and autumn.
 4. Repeat the AI test with a real weather forecast.
 5. Install cheap sensors in one pilot school and run the supply-temperature control as a trial.
