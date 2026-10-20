@@ -1,0 +1,117 @@
+{
+  "version": "ai_v1",
+  "train_end": "2022-03-01 00:00:00+01:00",
+  "lookback": 168,
+  "features": {
+    "daytypes": true,
+    "trend_groups": [
+      "consumption_change",
+      "level_vs_normal",
+      "temp_change",
+      "accumulated_cold"
+    ]
+  },
+  "rule": "horizon 1: trees (direct); horizons 6 and 24: average of trees and GRU (residual)",
+  "horizons": {
+    "1": {
+      "target": "direct",
+      "lags": {},
+      "trees": "lgb_h1.txt",
+      "n_training_windows": 120422
+    },
+    "6": {
+      "target": "residual",
+      "lags": {
+        "8105": 24,
+        "8107": 24,
+        "8116": 24
+      },
+      "trees": "lgb_h6.txt",
+      "n_training_windows": 118889,
+      "gru": "gru_h6.pt",
+      "gru_mean": [
+        128619.625,
+        7.617922306060791,
+        112.72004699707031,
+        2.612545967102051
+      ],
+      "gru_std": [
+        117242.2421875,
+        8.437938690185547,
+        192.5331268310547,
+        1.6240832805633545
+      ]
+    },
+    "24": {
+      "target": "residual",
+      "lags": {
+        "8105": 24,
+        "8107": 24,
+        "8116": 24
+      },
+      "trees": "lgb_h24.txt",
+      "n_training_windows": 113599,
+      "gru": "gru_h24.pt",
+      "gru_mean": [
+        128619.625,
+        7.617922306060791,
+        112.72004699707031,
+        2.612545967102051
+      ],
+      "gru_std": [
+        117242.2421875,
+        8.437938690185547,
+        192.5331268310547,
+        1.6240832805633545
+      ]
+    }
+  },
+  "files": {
+    "gru_h24.pt": "3eb24d66cf3d054cb8117cdd1a35befc7a3a604ad886e59502d2bf2f70f4ba06",
+    "gru_h6.pt": "7a0db141e8f59b70b3ea0c3c68bfbcc9f23b6947ec975d8287a3280d980fbb83",
+    "lgb_h1.txt": "4d590b3d23ea5ce3b4880f2374440ae2774c5a81a9f8b1afaf2d7eccc256f418",
+    "lgb_h24.txt": "1d130412a34310f736a34277209f0081a7c5a8dc3cb762442168e02576fc4d5e",
+    "lgb_h6.txt": "7315f92d49aa90d16a906a73432f0877e8b2ab7c95b625fe573b0e0f69ec4d8a"
+  },
+  "versions": {
+    "lightgbm": "4.7.0",
+    "torch": "2.14.1+cpu",
+    "pandas": "3.0.6"
+  },
+  "units": "Wh per hour",
+  "test_scores": [
+    {
+      "horizon": 1,
+      "wape": 0.0927
+    },
+    {
+      "horizon": 6,
+      "wape": 0.1276
+    },
+    {
+      "horizon": 24,
+      "wape": 0.1242
+    }
+  ],
+  "test_run_scores": [
+    {
+      "horizon": 1,
+      "mae_kwh": 9.6559,
+      "wape": 0.0927,
+      "skill": 0.6315
+    },
+    {
+      "horizon": 6,
+      "mae_kwh": 13.2868,
+      "wape": 0.127,
+      "skill": 0.4951
+    },
+    {
+      "horizon": 24,
+      "mae_kwh": 13.6084,
+      "wape": 0.1278,
+      "skill": 0.4925
+    }
+  ],
+  "test_scores_note": "test_scores: the saved models scored on the test block (2022-03-01 to 2023-10-22). test_run_scores: the earlier modeling.final run. Trees reproduce exactly; the GRU is a separate training run (not bit-reproducible), so the average differs: 0.1276 / 0.1242 here against 0.127 / 0.128 there. The difference is run-to-run variation, not a chosen improvement."
+}

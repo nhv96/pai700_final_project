@@ -15,6 +15,7 @@
   --legacy: #8a8984;   /* neutral: the reference */
   --combined: #2a78d6;
   --limit: #eb6834;
+  --forecast: #1f8f5f;   /* AI forecast overlay */
 }
 @media (prefers-color-scheme: dark) {
   :root {
@@ -33,6 +34,7 @@
     --legacy: #a3a29c;
     --combined: #3987e5;
     --limit: #d95926;
+    --forecast: #3fb985;
   }
 }
 
@@ -67,7 +69,8 @@ button:hover, select:hover { background: var(--wash); }
 button.primary { background: var(--accent); color: #fff; border-color: transparent; min-width: 72px; }
 button.primary:hover { filter: brightness(1.08); }
 :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-.forecast { opacity: 0.6; }
+.legend { color: var(--forecast); font-weight: 600; }
+.line.fc { stroke-dasharray: 6 4; stroke-width: 2; }
 .message { color: var(--ink-2); font-size: 14px; }
 .message.error { color: var(--ink); font-weight: 600; }
 

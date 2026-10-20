@@ -21,6 +21,7 @@ const state = {
   es: null, playing: false, finished: false,
   selected: null, range: "all",
   charts: {},                    // scales of the last draw, used by the hover layer
+  forecast: { available: false, cache: new Map(), model: null },   // "building:horizon" -> { t, v, byT, next, busy }
 };
 
 // ---------- start-up ----------
@@ -45,6 +46,8 @@ async function init() {
   $("speed").addEventListener("change", () => { if (state.playing) { stop(); play(); } });
   $("range").addEventListener("change", (e) => { state.range = e.target.value; schedule(); });
   $("recent").closest("details").addEventListener("toggle", schedule);
+  $("forecast").addEventListener("change", schedule);
+  $("forecast-h").addEventListener("change", schedule);
   window.addEventListener("resize", schedule);
   const hoverTarget = $("charts");
   hoverTarget.addEventListener("pointermove", onHover);
@@ -58,8 +61,48 @@ async function init() {
 async function forecastStatus() {
   try {
     const s = await (await fetch("/api/forecast/status")).json();
-    if (s.available) $("forecast").closest("label").title = "A forecast file is present, but the overlay is not built yet.";
+    if (!s.available) return;
+    state.forecast.available = true;
+    $("forecast").disabled = false;
+    $("forecast-h").disabled = false;
+    $("forecast-label").title = "Show what the AI model predicted for each hour, made the chosen time before";
+    const m = await fetch("/api/forecast/model");
+    if (m.ok) state.forecast.model = await m.json();
   } catch (_) { /* the toggle just stays disabled */ }
+}
+
+// The forecast for hour T made h hours earlier uses only data up to T - h, so it never peeks at the replay's future.
+// Forecasts are fetched in chunks, in order, and only for target hours the replay has reached.
+const forecastEntry = () => {
+  const key = `${state.selected}:${$("forecast-h").value}`;
+  if (!state.forecast.cache.has(key)) state.forecast.cache.set(key, { t: [], v: [], byT: new Map(), next: state.t0 + 167 * 3600, busy: false });
+  return state.forecast.cache.get(key);
+};
+const dataClock = (t) => new Date((t + 3600) * 1000).toISOString().slice(0, 16);   // epoch s -> "YYYY-MM-DDTHH:MM" in UTC+1
+
+async function loadForecast() {
+  if (!$("forecast").checked || !state.forecast.available || state.lastT === null || state.selected === null) return;
+  const e = forecastEntry(), h = Number($("forecast-h").value), building = state.selected;
+  const last = state.lastT - h * 3600;                             // latest origin whose target hour has been replayed
+  if (e.busy || last < e.next || (last - e.next < 23 * 3600 && e.t.length)) return;   // wait for about a day of new hours
+  e.busy = true;
+  const until = Math.min(last, e.next + 30 * DAY);
+  try {
+    const r = await fetch(`/api/forecast/series?from=${dataClock(e.next)}&until=${dataClock(until)}&building=${building}&horizons=${h}`);
+    if (!r.ok) throw new Error((await r.json()).detail ?? r.status);
+    const body = await r.json();
+    for (const p of body.series[String(h)]) {
+      const t = Date.parse(p.target_time) / 1000;
+      e.t.push(t); e.v.push(p.wh / 1000); e.byT.set(t, p.wh / 1000);
+    }
+    e.next = until + 3600;
+  } catch (err) {
+    $("forecast").checked = false;
+    message(`AI forecast unavailable: ${err.message}`, true);
+  } finally {
+    e.busy = false;
+    schedule();
+  }
 }
 
 function message(text, isError = false) {
@@ -95,6 +138,7 @@ function stop() {
 function restart() {
   stop();
   for (const d of state.data.values()) { d.t.length = 0; d.heat.length = 0; d.tout.length = 0; }
+  state.forecast.cache.clear();
   state.lastT = state.lastTs = state.phase = null;
   state.finished = false;
   message("");
@@ -139,6 +183,7 @@ function render() {
   renderTable();
   renderCharts();
   renderRecent();
+  loadForecast();
 }
 
 function renderClock() {
@@ -237,7 +282,7 @@ function xTicks(x0, x1) {
   return out;
 }
 
-function drawChart(svg, key, { t, v, color, fromZero, area, digits }) {
+function drawChart(svg, key, { t, v, color, fromZero, area, digits, extra }) {
   const w = svg.clientWidth || 800, h = svg.clientHeight || 200;
   svg.setAttribute("viewBox", `0 0 ${w} ${h}`);
   const [x0, x1] = domain();
@@ -246,6 +291,10 @@ function drawChart(svg, key, { t, v, color, fromZero, area, digits }) {
   const i0 = lowerBound(t, x0), i1 = lowerBound(t, x1 + 1);
   let lo = Infinity, hi = -Infinity;
   for (let i = i0; i < i1; i++) { if (v[i] < lo) lo = v[i]; if (v[i] > hi) hi = v[i]; }
+  if (extra) {
+    const j0 = lowerBound(extra.t, x0), j1 = lowerBound(extra.t, x1 + 1);
+    for (let i = j0; i < j1; i++) { if (extra.v[i] < lo) lo = extra.v[i]; if (extra.v[i] > hi) hi = extra.v[i]; }
+  }
   if (!isFinite(lo)) { lo = 0; hi = 1; }
   if (fromZero) lo = Math.min(0, lo);
   const yt = niceTicks(lo, hi);
@@ -269,6 +318,12 @@ function drawChart(svg, key, { t, v, color, fromZero, area, digits }) {
   } else {
     s += `<text x="${(w + M.left) / 2}" y="${h / 2}" text-anchor="middle">No data yet</text>`;
   }
+  if (extra) {
+    const j0 = lowerBound(extra.t, x0), j1 = lowerBound(extra.t, x1 + 1);
+    let d = "";
+    for (let i = j0; i < j1; i++) d += `${i === j0 ? "M" : "L"}${px(extra.t[i]).toFixed(1)} ${py(extra.v[i]).toFixed(1)}`;
+    if (d) s += `<path class="line fc" d="${d}" stroke="${extra.color}"/>`;
+  }
   s += `<g class="hover" visibility="hidden"><line class="cross" y1="${M.top}" y2="${h - M.bottom}"/><circle class="dot" r="4" fill="${color}"/></g>`;
   svg.innerHTML = s;                                              // only numbers and fixed text go in here
   state.charts[key] = { svg, px, py, x0, x1, w, h, color, digits };
@@ -280,8 +335,23 @@ function renderCharts() {
   const d = state.data.get(b.building_id);
   const css = getComputedStyle(document.documentElement);
   $("chart-building").textContent = `building ${b.building_id} (${num(b.floor_area)} m²)`;
-  drawChart($("chart-heat"), "heat", { t: d.t, v: d.heat, color: css.getPropertyValue("--heat").trim(), fromZero: true, area: true, digits: 1 });
+  const fc = $("forecast").checked && state.forecast.available ? forecastEntry() : null;
+  drawChart($("chart-heat"), "heat", { t: d.t, v: d.heat, color: css.getPropertyValue("--heat").trim(), fromZero: true, area: true, digits: 1,
+    extra: fc ? { t: fc.t, v: fc.v, color: css.getPropertyValue("--forecast").trim() } : null });
+  renderForecastNote(fc);
   drawChart($("chart-tout"), "tout", { t: d.t, v: d.tout, color: css.getPropertyValue("--tout").trim(), fromZero: false, area: false, digits: 1 });
+}
+
+function renderForecastNote(fc) {
+  const h = $("forecast-h").value, note = $("forecast-note");
+  $("forecast-legend").hidden = !fc;
+  $("forecast-legend-h").textContent = `${h} h`;
+  note.hidden = !fc;
+  if (!fc) return;
+  const m = state.forecast.model, sc = m?.test_scores?.find((x) => String(x.horizon) === h);
+  note.textContent = `AI forecast of the whole building's heat use, made ${h} h before each hour (model ${m?.version ?? "?"}, trained on data before ${m ? m.train_end.slice(0, 10) : "?"}). ` +
+    `The weather of the next hours is the measured weather replayed as a perfect forecast, so real forecast errors are not included.` +
+    (sc ? ` Error on the held-out test block: ${num(sc.wape * 100, 1)} % of the heat use.` : "");
 }
 
 // ---------- hover: one crosshair and one tooltip for both charts ----------
@@ -312,7 +382,11 @@ function onHover(e) {
   const tip = $("tooltip");
   tip.replaceChildren();
   tip.append(Object.assign(document.createElement("div"), { className: "when", textContent: timeFmt.format(at(d.t[i])) }));
-  for (const [name, value, unit, color] of [["Heat", d.heat[i], "kW", heat.color], ["Outdoor", d.tout[i], "°C", state.charts.tout.color]]) {
+  const fcv = $("forecast").checked && state.forecast.available ? forecastEntry().byT.get(d.t[i]) : undefined;
+  const rows = [["Heat", d.heat[i], "kW", heat.color]];
+  if (fcv !== undefined) rows.push([`AI forecast (${$("forecast-h").value} h before)`, fcv, "kW", getComputedStyle(document.documentElement).getPropertyValue("--forecast").trim()]);
+  rows.push(["Outdoor", d.tout[i], "°C", state.charts.tout.color]);
+  for (const [name, value, unit, color] of rows) {
     const row = document.createElement("div");
     row.className = "row";
     const left = document.createElement("span");

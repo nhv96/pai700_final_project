@@ -1,4 +1,4 @@
-# Runs the replay feed, the twin service and the dashboard together. Each part also runs on its own (see feed/ and dashboard/ READMEs).
+# Runs the replay feed, the twin service, the forecast service and the dashboard together. Each part also runs on its own (see feed/ and dashboard/ READMEs).
 services:
   feed:
     build: feed
@@ -16,11 +16,22 @@ services:
       - "8002:8002"
     depends_on:
       - feed
+  forecast:
+    build:
+      context: .                   # needs etl/, modeling/ and the saved models from the repository root
+      dockerfile: forecast_service/Dockerfile
+    environment:
+      FEED_URL: http://feed:8001
+    ports:
+      - "8003:8003"
+    depends_on:
+      - feed
   dashboard:
     build: dashboard
     environment:
       FEED_URL: http://feed:8001
       TWIN_URL: http://twin:8002
+      FORECAST_URL: http://forecast:8003
     ports:
       - "8000:8000"
     depends_on:

@@ -22,7 +22,5 @@ notebooks/
 heat-model/
 feed/
 dashboard/
-modeling/
-etl/
 tests/
 scenarios/

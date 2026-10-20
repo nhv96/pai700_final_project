@@ -19,7 +19,7 @@ import torch
 from torch import nn
 
 from etl import windows as w
-from modeling import baselines as bl
+from modeling.gbm import baseline_forecast
 from modeling.daytypes import day_flags
 
 HIDDEN = 64
@@ -89,13 +89,20 @@ def load_horizon(gold: pd.DataFrame, horizon: int, test_start: pd.Timestamp) -> 
                        tim[0].append(tim[1:]), np.concatenate(ys), np.concatenate(hist), list(mats))
 
 
-def baseline_forecast(d: HorizonData, val_start: pd.Timestamp) -> np.ndarray:
-    base = np.empty(len(d.y), dtype=np.float32)
-    for bid in d.buildings:
-        mine = d.building == bid
-        lag = bl.best_lag(d.hist_y[mine & (d.time < val_start)], d.y[mine & (d.time < val_start)], d.horizon)
-        base[mine] = bl.seasonal_naive(d.hist_y[mine], d.horizon, lag)
-    return base
+def serve_data(b: pd.DataFrame, building: int, origins: pd.DatetimeIndex, horizon: int) -> HorizonData:
+    """Windows of one building for forecasting: the target hour has no HtTot yet (y is NaN).
+
+    b holds the hourly rows up to the last origin and the weather/calendar rows up to origin + horizon."""
+    grid, mat = hourly_matrix(b)
+    p = grid.get_indexer(origins)
+    if ((p < w.LOOKBACK - 1) | (p + horizon >= len(grid))).any():
+        raise ValueError("window reaches outside the rows given")
+    win = p[:, None] + np.arange(-w.LOOKBACK + 1, 1)
+    if np.isnan(mat[win]).any() or np.isnan(mat[p[:, None] + np.arange(1, horizon + 1)][:, :, 1:]).any():
+        raise ValueError("a window contains a missing hour")
+    return HorizonData(horizon, {building: mat}, {building: grid}, np.full(len(p), building), p,
+                       origins + pd.Timedelta(hours=horizon), np.full(len(p), np.nan, np.float32),
+                       mat[win, 0], [building])
 
 
 class Net(nn.Module):
@@ -112,12 +119,12 @@ class Net(nn.Module):
 
 
 class Scaled:
-    """The hourly matrices scaled with statistics of the training period, and a batch builder."""
-    def __init__(self, d: HorizonData, train_end: pd.Timestamp):
-        # mean/std of the levels over the training windows' hours: all gold hours before train_end
-        cat = np.concatenate([m[g < train_end] for m, g in ((d.mats[b], d.grids[b]) for b in d.buildings)])
-        self.mean = np.nanmean(cat[:, _LEVEL_IDX], axis=0)
-        self.std = np.nanstd(cat[:, _LEVEL_IDX], axis=0) + 1e-6
+    """The hourly matrices scaled with the given mean and std of the levels, and a batch builder.
+
+    mean and std (one value per LEVELS column) come from the training period only: Scaled.fit
+    computes them, a saved model stores them."""
+    def __init__(self, d: HorizonData, mean: np.ndarray, std: np.ndarray):
+        self.mean, self.std = np.asarray(mean, dtype=np.float64), np.asarray(std, dtype=np.float64)
         self.d = d
         self.scaled = {}
         for b in d.buildings:
@@ -125,6 +132,12 @@ class Scaled:
             m[:, _LEVEL_IDX] = (m[:, _LEVEL_IDX] - self.mean) / self.std
             self.scaled[b] = np.nan_to_num(m)
         self.y_scale = float(self.std[0])
+
+    @classmethod
+    def fit(cls, d: HorizonData, train_end: pd.Timestamp) -> "Scaled":
+        """Statistics over all gold hours before train_end."""
+        cat = np.concatenate([d.mats[b][d.grids[b] < train_end] for b in d.buildings])
+        return cls(d, np.nanmean(cat[:, _LEVEL_IDX], axis=0), np.nanstd(cat[:, _LEVEL_IDX], axis=0) + 1e-6)
 
     def batch(self, rows: np.ndarray, base: np.ndarray):
         d, h = self.d, self.d.horizon
@@ -142,7 +155,7 @@ class Scaled:
         return torch.from_numpy(hist), torch.from_numpy(fut), torch.from_numpy(b.astype(np.float32))
 
 
-def _predict(net, sc, rows, base, anchor):
+def predict(net, sc, rows, base, anchor):
     net.eval()
     out = []
     with torch.no_grad():
@@ -175,7 +188,7 @@ def fit_net(sc: Scaled, train: np.ndarray, base: np.ndarray, anchor: np.ndarray,
             opt.zero_grad(); loss.backward()
             nn.utils.clip_grad_norm_(net.parameters(), 1.0)
             opt.step()
-        err = np.abs(_predict(net, sc, stop_rows, base, anchor) - d.y[stop_rows]).sum() / np.abs(d.y[stop_rows]).sum()
+        err = np.abs(predict(net, sc, stop_rows, base, anchor) - d.y[stop_rows]).sum() / np.abs(d.y[stop_rows]).sum()
         if log:
             log(f"      epoch {epoch + 1} stop-WAPE {err:.4f}")
         if err < best - 1e-4:
@@ -200,9 +213,9 @@ def run_fold(d: HorizonData, fold: w.Fold, scheme: str, target: str, held_out=No
     if len(train) == 0 or len(val) == 0:
         return pd.DataFrame()
     anchor = base if target == "residual" else np.zeros_like(base)
-    sc = Scaled(d, fold.val_start)
+    sc = Scaled.fit(d, fold.val_start)
     net = fit_net(sc, train, base, anchor, log, max_epochs)
-    pred = np.maximum(_predict(net, sc, val, base, anchor), 0.0)
+    pred = np.maximum(predict(net, sc, val, base, anchor), 0.0)
     return pd.DataFrame({
         "time": d.time[val], "y_true": d.y[val], "y_pred": pred, "y_base": base[val],
         "horizon": d.horizon, "fold": fold.name, "building_id": d.building[val],

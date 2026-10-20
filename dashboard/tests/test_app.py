@@ -56,12 +56,36 @@ def test_feed_down_gives_502():
     assert c.get("/api/buildings").status_code == 502
 
 
-def test_forecast_status(tmp_path):
-    assert make().get("/api/forecast/status").json() == {"available": False}
-    f = tmp_path / "forecasts.parquet"
-    assert make(forecasts_path=str(f)).get("/api/forecast/status").json() == {"available": False}
-    f.write_bytes(b"x")
-    assert make(forecasts_path=str(f)).get("/api/forecast/status").json() == {"available": True}
+def forecast_app(handler):
+    return TestClient(create_app("http://feed", transport=httpx.MockTransport(fake_feed), forecast_url="http://fc",
+                                 forecast_transport=httpx.MockTransport(handler)))
+
+
+def test_forecast_status_follows_the_service():
+    ok = lambda request: httpx.Response(200, json={"status": "ok"})
+    def down(request):
+        raise httpx.ConnectError("refused")
+    assert forecast_app(ok).get("/api/forecast/status").json() == {"available": True}
+    assert forecast_app(down).get("/api/forecast/status").json() == {"available": False}
+
+
+def test_forecast_series_is_forwarded_and_others_are_not():
+    def fc(request: httpx.Request) -> httpx.Response:
+        assert request.url.path == "/forecast/series"
+        return httpx.Response(200, json={"q": str(request.url.query, "utf-8")})
+    c = forecast_app(fc)
+    r = c.get("/api/forecast/series", params={"from": "2022-10-08T00:00", "until": "2022-10-09T00:00", "horizons": "24"})
+    assert r.status_code == 200 and "horizons=24" in r.json()["q"]
+    assert c.get("/api/forecast/forecast").status_code == 404
+    assert c.get("/api/forecast/secret").status_code == 404
+
+
+def test_forecast_service_errors_pass_through_and_down_is_502():
+    c = forecast_app(lambda request: httpx.Response(422, json={"detail": "bad"}))
+    assert c.get("/api/forecast/series").status_code == 422
+    def down(request):
+        raise httpx.ConnectError("refused")
+    assert forecast_app(down).get("/api/forecast/series").status_code == 502
 
 
 def test_serves_page():

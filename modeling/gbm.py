@@ -73,13 +73,23 @@ def load_horizon(gold: pd.DataFrame, horizon: int, test_start: pd.Timestamp, day
     )
 
 
-def baseline_forecast(d: HorizonData, val_start: pd.Timestamp) -> np.ndarray:
-    """Seasonal naive forecast of every window, using the lag chosen per building before val_start."""
-    base = np.empty(len(d.y), dtype=np.float32)
+def chosen_lags(d: HorizonData, val_start: pd.Timestamp) -> dict:
+    """Seasonal-naive lag (24 or 168) per building, chosen on its windows with target before val_start."""
+    lags = {}
     for bid in d.buildings:
+        train = (d.building == bid) & (d.time < val_start)
+        lags[bid] = bl.best_lag(d.hist_y[train], d.y[train], d.horizon)
+    return lags
+
+
+def baseline_forecast(d: HorizonData, val_start: pd.Timestamp) -> np.ndarray:
+    """Seasonal naive forecast of every window, using the lag chosen per building before val_start.
+
+    d only needs the attributes building, buildings, time, y, hist_y and horizon, so the GRU's
+    HorizonData works too."""
+    base = np.empty(len(d.y), dtype=np.float32)
+    for bid, lag in chosen_lags(d, val_start).items():
         mine = d.building == bid
-        train = mine & (d.time < val_start)
-        lag = bl.best_lag(d.hist_y[train], d.y[train], d.horizon)
         base[mine] = bl.seasonal_naive(d.hist_y[mine], d.horizon, lag)
     return base
 

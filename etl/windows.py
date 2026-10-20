@@ -87,8 +87,12 @@ def apply_scaler(df: pd.DataFrame, stats: pd.DataFrame) -> pd.DataFrame:
     return out
 
 
-def build_arrays(df: pd.DataFrame, origins: pd.DatetimeIndex, horizon: int, lookback: int = LOOKBACK):
-    """Arrays for one building. Returns hist (n, lookback, F_hist), future (n, horizon, F_future), y (n,)."""
+def build_arrays(df: pd.DataFrame, origins: pd.DatetimeIndex, horizon: int, lookback: int = LOOKBACK,
+                 with_target: bool = True):
+    """Arrays for one building. Returns hist (n, lookback, F_hist), future (n, horizon, F_future), y (n,).
+
+    with_target=False is for serving: the target hour has no HtTot yet (the rows after the origin only
+    carry weather and calendar), so y is returned as NaN and not checked."""
     grid = pd.date_range(df.index.min(), df.index.max(), freq="h")
     full = df.reindex(grid)
     hist_all = full[HISTORY_FEATURES].to_numpy(dtype=np.float32)
@@ -102,6 +106,6 @@ def build_arrays(df: pd.DataFrame, origins: pd.DatetimeIndex, horizon: int, look
     hist = hist_all[pos[:, None] + np.arange(-lookback + 1, 1)]
     future = fut_all[pos[:, None] + np.arange(1, horizon + 1)]
     y = y_all[pos + horizon]
-    if np.isnan(hist).any() or np.isnan(future).any() or np.isnan(y).any():
+    if np.isnan(hist).any() or np.isnan(future).any() or (with_target and np.isnan(y).any()):
         raise ValueError("window contains a missing hour; origins must come from valid_origins")
     return hist, future, y

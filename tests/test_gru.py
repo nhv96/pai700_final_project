@@ -15,7 +15,7 @@ def _gold(n=400, bid=1):
 def test_batch_alignment_and_scaling():
     gold = _gold()
     d = gru.load_horizon(gold, 6, pd.Timestamp("2018-02-01"))
-    sc = gru.Scaled(d, pd.Timestamp("2018-01-10"))
+    sc = gru.Scaled.fit(d, pd.Timestamp("2018-01-10"))
     rows = np.array([0, 5])
     hist, fut, _ = sc.batch(rows, np.zeros(len(d.y), np.float32))
     assert hist.shape == (2, w.LOOKBACK, len(gru.COLS)) and fut.shape == (2, 6, len(gru.FUT_COLS))

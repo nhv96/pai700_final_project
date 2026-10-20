@@ -11,8 +11,8 @@ The research solution has three parts that work together. This repository now co
 | Part | What it is | Status |
 |---|---|---|
 | **Digital twin (DT)** | A simulation of one school classroom (heating and ventilation) with a 60 s step. It gives us a safe place to test control ideas without touching a real building. | Simulation loop, radiator, ventilation with air-handling unit, sensors, schedule, our own two-node heat model (assumed parameters), the legacy controller and two better controllers exist (`twin/`). It runs on feed weather as a service (`twin_service/`). |
-| **AI model** | Predicts near-future heat load (`HtTot`, hourly) from past heat, weather and calendar. Meant to plug into the DT and feed the controller. | Working: ETL, baselines, LightGBM, tuning (`etl/`, `modeling/`). |
-| **Building-management dashboard** | One central place to see the buildings, their state, the AI forecasts and the DT results. | First version works (`dashboard/`): replay controls, buildings table, heat and outdoor-temperature charts, and a digital-twin panel (legacy vs combined controller, simulated). AI forecast overlay and status colours are not built yet. |
+| **AI model** | Predicts near-future heat load (`HtTot`, hourly, whole building) from past heat, weather and calendar. | Working: ETL, baselines, LightGBM, GRU, final test, saved models and a forecast service (`etl/`, `modeling/`, `models/`, `forecast_service/`). The twin's controllers do not use it yet; the dashboard shows it. |
+| **Building-management dashboard** | One central place to see the buildings, their state, the AI forecasts and the DT results. | First version works (`dashboard/`): replay controls, buildings table, heat and outdoor-temperature charts, and a digital-twin panel (legacy vs combined controller, simulated). The AI forecast overlay works (dashed line, from the forecast service). Status colours are not built yet. |
 
 How they fit together: the dataset is the common ground. The AI model learns from it, the DT replays the same weather, and the dashboard shows what both produce.
 
@@ -67,7 +67,7 @@ head out/run.csv
 Runs the twin on the replay feed's weather (own `pyproject.toml` and Dockerfile; details in `twin_service/README.md`).
 
 ```bash
-docker compose up --build            # feed :8001, twin :8002, dashboard http://localhost:8000
+docker compose up --build            # feed :8001, twin :8002, forecast :8003, dashboard http://localhost:8000
 ```
 
 Limits of the Oslo data for the heat model: `docs/oslo-data-limits.md`. Results on real Oslo weather: `docs/controllers-and-scenario.md`.
@@ -98,9 +98,25 @@ Own `pyproject.toml` and Dockerfile; details in `dashboard/README.md`. It only t
 docker compose up --build            # feed on :8001, twin service on :8002, dashboard on http://localhost:8000
 ```
 
-### AI model
+### Forecast service
+
+Serves the saved AI models over HTTP (own `pyproject.toml` and Dockerfile; details in `forecast_service/README.md`). The dashboard draws its forecasts over the measured heat use.
 
 ```bash
+cd forecast_service && uv sync
+FEED_URL=http://localhost:8001 MODEL_DIR=../models/ai_v1 PYTHONPATH=.. uv run uvicorn --factory forecast_service.app:create_app --port 8003
+```
+
+### AI model
+
+Final choice (see the decision log): LightGBM with day-type and trend features at 1 h, the average of LightGBM and a GRU at 6 h and 24 h. Test block (2022-03-01 to 2023-10-22) WAPE 0.093 / 0.127 / 0.128 for 1 / 6 / 24 h, against 0.252 for the seasonal naive baseline.
+
+```bash
+uv run python -m modeling.final                      # the final test run, use once -> results/final/
+uv run python -m modeling.export                     # train on data before the test block and save -> models/ai_v1/ (about 40 min)
+uv run python -m modeling.run_gru --schemes pooled   # GRU on all folds (about 2.5 h on CPU) -> results/gru/
+uv run python -m modeling.plot_final                 # winter and holiday week plots -> results/final/figures/
+uv run python -m modeling.run_gbm --daytypes --trends   # LightGBM with day-type and trend features on all folds
 uv run python -m modeling.run_gbm [--daytypes]       # LightGBM on all folds -> results/gbm/
 uv run python -m modeling.persistence_report         # compare with persistence at horizon 1
 uv run python -m modeling.tuning search              # random search for LightGBM settings -> results/tuning/
@@ -134,7 +150,9 @@ A full `run_gbm` takes about 40 minutes. If `uv run` picks up the wrong packages
 | `docker-compose.yml` | runs the feed and the dashboard together |
 | `etl/preprocess_htot.py` | silver and gold layers from the raw files |
 | `etl/windows.py` | time splits and forecasting windows |
-| `modeling/` | baselines, metrics, LightGBM (`gbm.py`), tuning, day types, features |
+| `modeling/` | baselines, metrics, LightGBM (`gbm.py`), GRU (`gru.py`), tuning, day types, features, final test (`final.py`), model export and loading (`export.py`, `predictor.py`) |
+| `models/ai_v1/` | the saved models (LightGBM boosters, GRU weights) with a manifest of SHA-256 checksums |
+| `forecast_service/` | HTTP service that forecasts building heat use with the saved models (own project and Dockerfile) |
 | `config/params.yaml` | twin parameters |
 | `docs/` | explanations: parameters, energy balance, metrics, how LightGBM training works |
 | `notebooks/` | data quality scan and the decision log |
@@ -149,7 +167,8 @@ The twin already runs our own `TwoNodeRoomModel`. Another model only has to impl
 
 1. Calibrate the heat model with indoor temperature and plant data from the client (see `docs/oslo-data-limits.md`).
 2. Connect the AI forecast to the DT controller (optimal start/stop).
-3. Grow the dashboard: AI forecast overlay (when the model output exists) and status colours.
+3. Grow the dashboard: status colours, and the forecast for the next hours beyond the replay clock.
+4. Let the twin's controllers use a heat-load forecast (needs a rule that maps a whole-building load to the classroom; not defined yet).
 
 ## Results so far (AI model)
 

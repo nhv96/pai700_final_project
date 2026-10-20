@@ -37,8 +37,15 @@
         <option value="all" selected>Whole window</option>
       </select>
     </label>
-    <label class="forecast" title="Waiting for the AI model's forecasts">
-      <input id="forecast" type="checkbox" disabled> AI forecast
+    <label class="forecast" id="forecast-label" title="The forecast service is not reachable">
+      <input id="forecast" type="checkbox" disabled> AI forecast made
+    </label>
+    <label class="forecast-h">
+      <select id="forecast-h" aria-label="How long before the hour the forecast was made" disabled>
+        <option value="1">1 h</option>
+        <option value="6">6 h</option>
+        <option value="24" selected>24 h</option>
+      </select> before
     </label>
     <span id="message" class="message" role="status"></span>
   </section>
@@ -67,8 +74,9 @@
     <section class="card" aria-labelledby="chart-h">
       <div class="charts" id="charts">
         <h2 id="chart-h">Heat use, <span id="chart-building">–</span></h2>
-        <p class="muted unit">kW, hourly average</p>
+        <p class="muted unit">kW, hourly average <span id="forecast-legend" class="legend" hidden>· dashed: AI forecast <span id="forecast-legend-h"></span> before</span></p>
         <svg id="chart-heat" role="img" aria-label="Heat use over time"></svg>
+        <p id="forecast-note" class="hint" hidden></p>
         <h2 class="second">Outdoor temperature</h2>
         <p class="muted unit">°C</p>
         <svg id="chart-tout" role="img" aria-label="Outdoor temperature over time"></svg>

@@ -1,0 +1,35 @@
+[project]
+name = "pai700-forecast-service"
+version = "0.1.0"
+description = "HTTP service that forecasts building heat use (HtTot) with the saved AI models (PAI700)"
+requires-python = ">=3.13"
+dependencies = [
+    "fastapi>=0.143.5",
+    "holidays>=0.106",
+    "httpx>=0.28.1",
+    "lightgbm>=4.7.0",
+    "numpy>=2.5.4",
+    "pandas>=3.0.6",
+    "python-dateutil>=2.9",
+    "torch>=2.14.1",
+    "uvicorn>=0.54.0",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=9.1.1",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+# "." for forecast_service, ".." for the shared etl/ and modeling/ packages at the repository root
+pythonpath = [".", ".."]
+
+# CPU-only torch (no GPU in the service, and the CUDA build is about 2 GB larger)
+[tool.uv.sources]
+torch = { index = "pytorch-cpu" }
+
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true
