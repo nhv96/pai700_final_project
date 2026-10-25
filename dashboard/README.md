@@ -1,25 +1,18 @@
-# dashboard: building heat monitor
+# dashboard: playback console and building display
 
-A lightweight page for the client's staff to watch the heat use of several buildings. It is an isolated sub-project: it never imports code from the other parts and gets all its data from the replay feed (`../feed`) over HTTP.
+Two pages served by one small server. It is an isolated sub-project: it never imports code from the other parts and gets all its data over HTTP.
 
-- **Server** (`dashboard/app.py`, FastAPI): serves the page and forwards `/api/buildings`, `/api/readings`, `/api/weather-forecast` and `/api/stream` to the feed, `/api/twin/compare` to the twin service and `/api/forecast/*` to the forecast service. It holds no data. New sources are added here as new routes.
-- **Page** (`dashboard/static/`, plain HTML, CSS and JavaScript, no build step): a table of buildings and two charts (heat use, outdoor temperature) for the selected building.
+- **Playback console** (`/`, `dashboard/static/`): play, pause, restart and speed of the replay, the simulated clock (data time, UTC+1), progress in the window and whether the feed, twin and forecast services are reachable. It controls the clock behind the scenes; it shows no building data.
+- **Building display** (`/bms/`, `dashboard/static/bms/`): the management display for the client. It shows the replayed buildings, a simulated classroom and the AI forecast, and follows the clock. Read-only. See `static/bms/README.md`.
+- **Server** (`dashboard/app.py`, FastAPI): holds the shared replay clock and forwards `/api/buildings`, `/api/readings`, `/api/weather-forecast` and `/api/stream` to the feed, `/api/twin/*` to the twin service and `/api/forecast/*` to the forecast service. It holds no data besides the clock.
 
-The buildings come from the feed, so adding a building to the frozen file adds it to the page.
+The buildings come from the feed, so adding a building to the frozen file adds it to the display.
 
-## What it shows
+## Shared replay clock and the BMS display
 
-Replay controls (play, pause, restart, speed), the simulated clock (data time, UTC+1), and a chart range (last 7 days, last 30 days, whole window). Per building: floor area, heat now (kW), last 24 hours (kWh and kWh per m²) and outdoor temperature. Hover a chart for a crosshair and the values; "Show the last 24 hours as a table" gives the same numbers as text.
+The server keeps one replay clock for all pages (`dashboard/playback.py`): `GET /api/playback` (state), `GET /api/playback/events` (server-sent events: the state now, then after every change and every simulated hour) and `POST /api/playback/play|pause|restart` and `POST /api/playback/speed` with `{"speed": hours_per_second}`. The window bounds come from the feed; the feed itself stays without a clock. The clock stops at the end of the window and `restart` goes back to the first hour.
 
-The page owns its clock. Pause closes the stream; play opens it again from the last hour received.
-
-The **digital-twin panel** (`static/twin.js`) asks the twin service for a simulated classroom week on the selected building's weather: legacy against combined controller, a totals table, room temperature and heat power charts. It is labelled as a simulation. The server forwards `/api/twin/compare` to the twin service (`TWIN_URL`, default `http://localhost:8002`).
-
-The **AI forecast overlay**: tick "AI forecast made [1 / 6 / 24 h] before" and the heat chart gets a dashed line with what the model predicted for each hour that long before it. The forecasts come from the forecast service (`FORECAST_URL`, default `http://localhost:8003`; the box stays disabled while the service is unreachable). Only hours the replay has already reached are drawn, and each forecast used data up to its own origin only. A note under the chart says the forecast is for the whole building and uses the perfect weather forecast. The server forwards `/api/forecast/series` and `/api/forecast/model`; `/api/forecast/status` reports whether the service answers.
-
-The **AI benchmark in the twin card**: after a simulation the heat-power chart gets a dashed line with the 24 h forecast for the whole building scaled to the room (room m² / building m²), and the table gets the same total in kWh. It is a rough reference only: the building number includes hot water and an average square metre, and no controller reads it. The note under the chart says this. If the forecast service is down or does not cover the period, the card says so and the rest still works.
-
-Not built yet: status colours, and the forecast for the hours after the replay clock.
+The building display (the former `bms-dashboard/`, work of a teammate) lives in `dashboard/static/bms/` and is served at `/bms/`. It reads our API and follows this clock; the console at `/` controls it.
 
 ## Run
 

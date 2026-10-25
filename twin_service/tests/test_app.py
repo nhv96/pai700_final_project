@@ -49,10 +49,11 @@ def test_compare_returns_both_runs_and_a_warning(client):
     leg, comb = body["runs"]["legacy"], body["runs"]["combined"]
     assert leg["summary"]["heat_vs_legacy_pct"] == 0.0
     assert len(leg["series"]["time"]) == 2 * 24 * 6  # 10-minute points
-    assert set(leg["series"]) == {"time", "t_air_C", "radiator_kW", "coil_kW", "supply_air_C"}
+    assert set(leg["series"]) == {"time", "t_air_C", "radiator_kW", "coil_kW", "supply_air_C", "occupants"}
     assert len(body["weather"]["t_outdoor_C"]) == len(leg["series"]["time"])
     assert "Simulation" in body["note"] and body["south_facade_ratio"] == 1.5
     assert body["room_floor_area_m2"] == 60
+    assert body["comfort_band_C"] == [20, 26]
     # the combined controller never uses more heat than twice legacy; sanity, not a claim
     assert comb["summary"]["heat_kWh"] > 0
 
