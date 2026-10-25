@@ -203,7 +203,7 @@ button, input { font-family: inherit; }
 .view[hidden] { display: none; }
 
 /* ------------------------------------------------------------------ */
-/* Weekly temperature — weather effect (decorative, behind the content) */
+/* Smart heating — weather effect (decorative, behind the content) */
 /* ------------------------------------------------------------------ */
 .weather-fx {
   position: fixed; top: 0; bottom: 0; left: 236px; right: 0;
@@ -449,7 +449,7 @@ table.data-table th { color: var(--ink-muted); font-weight: 600; font-size: 11px
 }
 .b-row {
   display: grid;
-  grid-template-columns: 1.7fr 1fr 1.2fr 1fr 1.5fr 0.9fr;
+  grid-template-columns: 1.4fr 1.3fr 1fr 1fr 0.9fr 0.9fr 1fr 1fr 1fr;
   align-items: center; gap: 10px;
   padding: 11px 16px;
   border-bottom: 1px solid var(--border);
@@ -702,8 +702,9 @@ table.param-table th, table.param-table td { text-align: left; }
   }
   .kpi-row { grid-template-columns: repeat(2, 1fr); }
   .settings-grid { grid-template-columns: 1fr; }
-  .b-row { grid-template-columns: 1.3fr 0.9fr 0.9fr 0.6fr; }
+  .b-row { grid-template-columns: 1.3fr 0.9fr 0.9fr 0.9fr 0.9fr; }
   .b-row .b-mode, .b-row .b-type { display: none; }
+  .b-row .b-temp:nth-child(n+4):nth-child(-n+6) { display: none; }
   .weather-fx { left: 0; }
 }
 .b-row.b-head .b-temp { font-family: inherit; font-size: 11px; font-weight: 600; color: var(--ink-muted); }

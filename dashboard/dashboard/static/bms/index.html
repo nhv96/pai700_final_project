@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Kraftstaden AB — Heat Control</title>
-<link rel="stylesheet" href="dashboard.css?v=18" />
+<link rel="stylesheet" href="dashboard.css?v=20" />
 </head>
 <body>
 
@@ -29,7 +29,7 @@
       </button>
       <button class="nav-item" data-section="weekly" aria-current="false" type="button">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 14.5V5a2 2 0 1 0-4 0v9.5a4 4 0 1 0 4 0z"/><line x1="12" y1="7" x2="12" y2="12"/></svg>
-        Weekly temperature
+        Smart heating
       </button>
       <button class="nav-item" data-section="settings" aria-current="false" type="button">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M2 12h3M19 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1"/></svg>
@@ -67,7 +67,7 @@
       </div>
     </header>
 
-    <!-- ===================== Weekly temperature ===================== -->
+    <!-- ===================== Smart heating ===================== -->
     <section class="view" id="view-weekly" hidden>
       <div class="weather-fx" id="weatherFx" aria-hidden="true"></div>
 
@@ -92,30 +92,24 @@
 
       <div class="kpi-row" id="kpiRow"></div>
 
-      <div class="card">
-        <h2>Heat-usage forecast <span class="confidence-pill derived" style="vertical-align:middle;">AI model</span></h2>
-        <div class="kpi-row" id="forecastRow"></div>
-        <p class="hint" id="forecastFeatures"></p>
-      </div>
-
       <div id="chartsView">
         <div class="card">
-          <h2>Indoor temperature — baseline vs. optimized</h2>
+          <h2>Indoor temperature — current vs. smart heating</h2>
           <p class="card-sub">Shaded band = comfort target. Gray bands = occupied hours. Outdoor temperature shown as dashed reference.</p>
           <div class="legend">
-            <span class="legend-item"><span class="legend-swatch-line" style="background:var(--series-baseline)"></span>Baseline (fixed schedule)</span>
-            <span class="legend-item"><span class="legend-swatch-line" style="background:var(--series-optimized)"></span>Optimized (forecast-based)</span>
+            <span class="legend-item"><span class="legend-swatch-line" style="background:var(--series-baseline)"></span>Current heating (fixed schedule)</span>
+            <span class="legend-item"><span class="legend-swatch-line" style="background:var(--series-optimized)"></span>Smart heating (uses the weather forecast)</span>
             <span class="legend-item"><span class="legend-swatch-dash"></span>Outdoor temp</span>
           </div>
           <div class="chart-wrap" id="tempChartWrap"></div>
         </div>
 
         <div class="card">
-          <h2>Heating power draw — baseline vs. optimized</h2>
+          <h2>Heating power draw — current vs. smart heating</h2>
           <p class="card-sub">Lower, smoother curves mean less peak demand and lower effect-based grid charges.</p>
           <div class="legend">
-            <span class="legend-item"><span class="legend-swatch-line" style="background:var(--series-baseline)"></span>Baseline (kW)</span>
-            <span class="legend-item"><span class="legend-swatch-line" style="background:var(--series-optimized)"></span>Optimized (kW)</span>
+            <span class="legend-item"><span class="legend-swatch-line" style="background:var(--series-baseline)"></span>Current heating (kW)</span>
+            <span class="legend-item"><span class="legend-swatch-line" style="background:var(--series-optimized)"></span>Smart heating (kW)</span>
           </div>
           <div class="chart-wrap" id="powerChartWrap"></div>
         </div>
@@ -124,8 +118,8 @@
           <h2>Cumulative energy consumption</h2>
           <p class="card-sub">Running total over the selected period — the gap between the lines is the savings.</p>
           <div class="legend">
-            <span class="legend-item"><span class="legend-swatch-line" style="background:var(--series-baseline)"></span>Baseline (kWh)</span>
-            <span class="legend-item"><span class="legend-swatch-line" style="background:var(--series-optimized)"></span>Optimized (kWh)</span>
+            <span class="legend-item"><span class="legend-swatch-line" style="background:var(--series-baseline)"></span>Current heating (kWh)</span>
+            <span class="legend-item"><span class="legend-swatch-line" style="background:var(--series-optimized)"></span>Smart heating (kWh)</span>
           </div>
           <div class="chart-wrap" id="cumChartWrap"></div>
         </div>
@@ -161,9 +155,13 @@
           <div class="b-temp">Last 24 h</div>
           <div class="b-temp">kWh / m²</div>
           <div class="b-temp">Outdoor</div>
+          <div class="b-temp">Forecast +1 h</div>
+          <div class="b-temp">Forecast +6 h</div>
+          <div class="b-temp">Forecast +24 h</div>
         </div>
         <!-- rows injected by dashboard.js -->
       </div>
+      <p class="hint" id="forecastFeatures"></p>
     </section>
 
     <!-- ===================== Settings ===================== -->
@@ -200,9 +198,9 @@
       </div>
 
       <div class="card">
-        <h2>Weekly temperature: a simulated classroom</h2>
-        <p class="card-sub">Indoor temperature and heating power on the Weekly page come from a digital twin of one 60 m² classroom, run on the weather of the selected building for the last completed days before the clock. It is a simulation, not a measurement.</p>
-        <p class="hint"><strong>Baseline</strong> is the legacy controller: fixed radiator timers with a thermostat, ventilation 07:00&ndash;16:00 that is boosted by 50&nbsp;% when the room reaches 24&nbsp;&deg;C, and a ventilation coil that always heats the air to 21&nbsp;&deg;C. <strong>Optimized</strong> is the combined controller: forecast-based radiator start and look-ahead thermostat, plus a coil target that is lowered when the room is warm. It uses a perfect weather forecast and a perfect room model, so it shows the best case.</p>
+        <h2>Smart heating: a simulated classroom</h2>
+        <p class="card-sub">Indoor temperature and heating power on the Smart heating page come from a digital twin of one 60 m² classroom, run on the weather of the selected building for the last completed days before the clock. It is a simulation, not a measurement.</p>
+        <p class="hint"><strong>Current heating</strong> is how the school is heated today: fixed radiator timers with a thermostat, ventilation 07:00&ndash;16:00 that is boosted by 50&nbsp;% when the room reaches 24&nbsp;&deg;C, and a ventilation coil that always heats the air to 21&nbsp;&deg;C. <strong>Smart heating</strong> uses the weather forecast: it starts the radiators at the right time, looks ahead with the thermostat, and sets the ventilation coil target that lower when the room is warm. It is given a perfect weather forecast and a perfect room model, so it shows the best case.</p>
       </div>
 
       <div class="card">
@@ -264,7 +262,7 @@
 
 </aside>
 
-<script src="data-source.js?v=1"></script>
-<script src="dashboard.js?v=19"></script>
+<script src="data-source.js?v=2"></script>
+<script src="dashboard.js?v=23"></script>
 </body>
 </html>

@@ -135,21 +135,26 @@ test("twin series become 24 hourly rows per day: kW, kWh, occupancy, band", asyn
   assert.match(d.meta.scenario_scope, /60 m² classroom/);
 });
 
-test("forecast: three horizons in kWh, from the clock's hour", async () => {
+test("forecast: three horizons in kWh for every building, from the clock's hour", async () => {
   const t = setup({ position: "2022-11-08T09:00:00+01:00" });
   await t.flush();
-  const f = t.last().forecast;
-  assert.deepEqual(f.horizons.map((h) => h.predicted_kwh), [1, 6, 24]);
-  assert.equal(f.model.version, "ai_v1");
-  const call = t.calls.find((u) => u.startsWith("/api/forecast/series"));
-  assert.ok(call.includes("from=2022-11-08T09:00&until=2022-11-08T09:00&building=1&horizons=1,6,24"), call);
+  const d = t.last();
+  assert.ok(d.buildings.length >= 1);
+  d.buildings.forEach((b) => assert.deepEqual(b.forecast_kwh, [1, 6, 24]));
+  assert.equal(d.forecast.model.version, "ai_v1");
+  assert.deepEqual(d.forecast.hours, [1, 6, 24]);
+  const calls = t.calls.filter((u) => u.startsWith("/api/forecast/series"));
+  assert.equal(calls.length, d.buildings.length);
+  d.buildings.forEach((b) => assert.ok(
+    calls.some((u) => u.includes("from=2022-11-08T09:00&until=2022-11-08T09:00&building=" + b.building_id + "&horizons=1,6,24")), String(b.building_id)));
 });
 
-test("forecast failure is reported, the rest still works", async () => {
+test("forecast failure is reported per building, the rest still works", async () => {
   const t = setup({ position: "2022-11-08T09:00:00+01:00", fail: { "/api/forecast/series": "needs a week of history" } });
   await t.flush();
   const d = t.last();
-  assert.equal(d.forecast.error, "needs a week of history");
+  assert.equal(d.buildings[0].forecast_error, "needs a week of history");
+  assert.deepEqual(d.buildings[0].forecast_kwh, [null, null, null]);
   assert.equal(d.buildings[0].heat_kw, 2);
 });
 

@@ -5,7 +5,7 @@ The building-management display for Trollhättan Stad / Kraftstaden (a teammate'
 ## What it shows
 
 - **Control panel:** the replayed buildings (heat now, last 24 h, kWh/m², outdoor temperature) and a drawer per building with its last 24 hours.
-- **Weekly temperature:** a simulated 60 m² classroom, legacy (baseline) vs combined (optimized) controller, for the last 1-7 completed days before the clock, on the weather of the selected building. Plus the AI heat forecast (1, 6, 24 h) made at the clock's hour.
+- **Smart heating:** a simulated 60 m² classroom, legacy (baseline) vs combined (optimized) controller, for the last 1-7 completed days before the clock, on the weather of the selected building. Plus the AI heat forecast (1, 6, 24 h) made at the clock's hour.
 - **Settings:** °C/°F and light/dark theme (kept in the browser).
 - **About:** data provenance, scenarios, room model, benchmarks and parameter table with confidence tags (`data/about.json`).
 
@@ -16,7 +16,7 @@ Everything shown is from the API (`/api/playback`, `/api/readings`, `/api/twin/c
 ```
 index.html       app shell and markup
 dashboard.css    styles (light/dark via CSS variables)
-dashboard.js     rendering: control panel, drawer, weekly charts, About
+dashboard.js     rendering: control panel, drawer, controller-comparison charts, About
 data-source.js   the adapter: API + shared clock -> the page's data object
 data/about.json  static About tables (benchmarks, parameters, open items)
 assets/          logo and sidebar background

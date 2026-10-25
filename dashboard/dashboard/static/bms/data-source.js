@@ -5,7 +5,7 @@
 //   /api/buildings           the buildings and the window of the frozen data
 //   /api/readings            heat and weather of the last 24 hours, never later than the clock
 //   /api/twin/compare        simulated classroom, legacy vs combined controller, for the last N COMPLETED days
-//   /api/forecast/*          AI heat forecast made at the clock's hour
+//   /api/forecast/*          AI heat forecast of every building, made at the clock's hour
 //
 // Usage: BmsSource.start({ onData, onStatus }); BmsSource.select({ building, days }).
 // onData(data) is called after every refresh; data.clock.position is null until the replay has been started.
@@ -25,7 +25,7 @@
   var readings = {};                    // building id -> [{t, heat_kw, tout}] for the last 24 hours
   var selection = { building: null, days: 3 };
   var twin = { key: null, body: null, loading: null, error: null };
-  var forecast = { key: null, value: null, model: null, modelTried: false };
+  var forecast = { key: null, byBuilding: {}, note: null, model: null, modelTried: false };
   var refreshing = false, again = false, timer = null;
 
   // epoch seconds <-> the data's fixed UTC+1 wall clock ("YYYY-MM-DDTHH:MM")
@@ -65,7 +65,7 @@
       clock = JSON.parse(ev.data);
       if (prev && prev.position && clock.position && epoch(clock.position) < epoch(prev.position)) {   // restarted: forget the old run
         Object.keys(readings).forEach(function (k) { readings[k] = []; });
-        forecast.key = null; forecast.value = null;
+        forecast.key = null; forecast.byBuilding = {};
         twin.key = null; twin.body = null; twin.error = null;
       }
       schedule();
@@ -111,24 +111,29 @@
     });
   }
 
-  // The AI forecast made at the clock's hour, for the selected building. It only used data up to that hour.
+  // The AI forecast of every building, made at the clock's hour. It only used data up to that hour.
+  // A building that fails (e.g. less than a week of history yet) gets an error of its own; the others still show.
   function loadForecast() {
-    var key = selection.building + "@" + clock.position;
-    if (forecast.key === key || selection.building === null) return Promise.resolve();
+    var key = clock.position;
+    if (forecast.key === key) return Promise.resolve();
     var at = dataClock(epoch(clock.position));
-    var q = "from=" + at + "&until=" + at + "&building=" + selection.building + "&horizons=" + FORECAST_HOURS.join(",");
     var model = forecast.modelTried ? Promise.resolve() : getJson("/api/forecast/model").then(
       function (m) { forecast.model = m; }, function () {}).then(function () { forecast.modelTried = true; });
-    return model.then(function () { return getJson("/api/forecast/series?" + q); }).then(function (body) {
-      forecast.value = {
-        building: selection.building, origin: clock.position, note: body.note, model: forecast.model,
-        horizons: FORECAST_HOURS.map(function (h) {
-          var p = (body.series[String(h)] || [])[0];
-          return { label: "Next " + h + " h", hours: h, predicted_kwh: p ? p.wh / 1000 : null };
-        })
-      };
-    }).catch(function (e) {
-      forecast.value = { error: e.message };      // e.g. less than a week of history yet, or the service is down
+    return model.then(function () {
+      return Promise.all(info.buildings.map(function (b) {
+        var q = "from=" + at + "&until=" + at + "&building=" + b.building_id + "&horizons=" + FORECAST_HOURS.join(",");
+        return getJson("/api/forecast/series?" + q).then(function (body) {
+          forecast.note = body.note;
+          forecast.byBuilding[b.building_id] = {
+            kwh: FORECAST_HOURS.map(function (h) {
+              var p = (body.series[String(h)] || [])[0];
+              return p ? p.wh / 1000 : null;
+            })
+          };
+        }, function (e) {
+          forecast.byBuilding[b.building_id] = { error: e.message };
+        });
+      }));
     }).then(function () { forecast.key = key; });
   }
 
@@ -208,7 +213,9 @@
         series24: { t: rows.map(function (r) { return r.t; }), heat_kw: rows.map(function (r) { return r.heat_kw; }) },
         heat_kw: n ? rows[n - 1].heat_kw : null,
         kwh_24h: kwh24, kwh_m2_24h: kwh24 === null ? null : kwh24 / b.floor_area,
-        outdoor_c: n ? rows[n - 1].tout : null
+        outdoor_c: n ? rows[n - 1].tout : null,
+        forecast_kwh: (forecast.byBuilding[b.building_id] || {}).kwh || FORECAST_HOURS.map(function () { return null; }),
+        forecast_error: (forecast.byBuilding[b.building_id] || {}).error || null
       };
     });
     var sel = buildings.filter(function (b) { return b.building_id === selection.building; })[0];
@@ -223,7 +230,7 @@
       outdoor_c: sel ? sel.outdoor_c : null,
       timeseries: [],
       twin: null,
-      forecast: forecast.value
+      forecast: forecast.key === null ? null : { hours: FORECAST_HOURS, origin: forecast.key, note: forecast.note, model: forecast.model }
     };
     if (twin.body) {
       data.timeseries = twinRows(twin.body);
@@ -234,7 +241,7 @@
       };
       data.meta.scenario_scope = "Simulated " + twin.body.room_floor_area_m2 + " m² classroom on the weather of building " +
         twin.body.building + ", " + twin.body.days + " completed day(s) from " + twin.body.start +
-        ". Baseline = legacy controller; optimized = forecast heating + supply-temperature controller.";
+        ". Current heating = the legacy controls; smart heating = forecast-based heating and supply-air control.";
     }
     data.twin_error = twin.error;
     return data;

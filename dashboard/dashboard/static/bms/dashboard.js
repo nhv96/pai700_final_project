@@ -53,7 +53,7 @@
   // ---------------------------------------------------------------------
   // Nav / section switching
   // ---------------------------------------------------------------------
-  var sectionTitles = { weekly: "Weekly temperature", control: "Control panel", settings: "Settings", about: "About" };
+  var sectionTitles = { weekly: "Smart heating", control: "Control panel", settings: "Settings", about: "About" };
   document.getElementById("mainNav").addEventListener("click", function (e) {
     var btn = e.target.closest(".nav-item");
     if (!btn) return;
@@ -178,38 +178,26 @@
   }
 
   // ---------------------------------------------------------------------
-  // Heat-usage forecast (preview) — 
-  // model (SINTEF COFACTOR-SBHUB Oslo school dataset) but hasn't shared
-  // trained output yet. DATA.forecast.status === "illustrative" means these
-  // numbers are a stand-in, not real predictions, so every render keeps the
-  // "illustrative" badge visible rather than letting it read like live output.
+  // Heat-usage forecast: the AI model's prediction for every building is shown as columns of the building
+  // table (renderBuildings); this writes the line under the table.
   // ---------------------------------------------------------------------
   function renderForecast() {
     var f = DATA.forecast;
-    var row = document.getElementById("forecastRow");
-    var featEl = document.getElementById("forecastFeatures");
-    if (!row) return;
-    if (!f || f.error) {
-      row.innerHTML = "";
-      featEl.textContent = f && f.error ? "No forecast yet: " + f.error : "Forecast appears once the replay has started.";
-      return;
-    }
-    row.innerHTML = f.horizons.map(function (h) {
-      return '<div class="kpi">' +
-        '<div class="label">' + escapeHtml(h.label) + '</div>' +
-        '<div class="value" style="font-size:19px;">' + (h.predicted_kwh === null ? "—" : fmtNum(h.predicted_kwh) + " kWh") + '</div>' +
-        '<div class="sub">building ' + escapeHtml(String(f.building)) + ', whole building</div>' +
-        '</div>';
-    }).join("");
+    var el = document.getElementById("forecastFeatures");
+    if (!el) return;
+    var failed = DATA.buildings.filter(function (b) { return b.forecast_error; })[0];
+    if (!f) { el.textContent = "Forecasts appear once the replay has started."; return; }
     var m = f.model;
-    featEl.textContent = (m ? "Model " + m.version + ", trained on data before " + m.train_end.slice(0, 10) + ". " : "") + (f.note || "");
+    el.textContent = (m ? "Forecast model " + m.version + ", trained on data before " + m.train_end.slice(0, 10) + ". " : "") +
+      "Each forecast is the heat use of that one hour, predicted at " + fmtDateTime(f.origin) + ". " + (f.note || "") +
+      (failed ? " No forecast for " + failed.name + ": " + failed.forecast_error : "");
   }
 
   // ---------------------------------------------------------------------
   // Settings — validation benchmarks + model parameters (from the
   // classroom-twin parameter research, data/params_research.md).
   // Static per load: reuses the .kpi tile and .data-table markup already
-  // styled for the Weekly temperature page, so nothing new to theme.
+  // styled for the Smart heating page, so nothing new to theme.
   // ---------------------------------------------------------------------
   function renderBenchmarks() {
     var el = document.getElementById("benchmarkRow");
@@ -259,7 +247,7 @@
     setLiveWeather(DATA.outdoor_c);
   }
 
-  // Decorative weather effect behind the Weekly temperature page, based on
+  // Decorative weather effect behind the Smart heating page, based on
   // today's outdoor reading: <=0C snow, 0-8C rain, warmer is sunny. There's
   // no precipitation field in the data, so this is a temperature-based
   // stand-in rather than a real forecast condition.
@@ -353,21 +341,21 @@
       {
         label: "Total energy use",
         value: fmtNum(optTotal) + " kWh",
-        sub: "vs " + fmtNum(baseTotal) + " kWh baseline",
+        sub: "vs " + fmtNum(baseTotal) + " kWh current heating",
         delta: (savingsPct >= 0 ? "↓ " : "↑ ") + Math.abs(savingsPct).toFixed(1) + "% " + (savingsPct >= 0 ? "savings" : "more"),
         good: savingsPct >= 0
       },
       {
         label: "Peak heating demand",
         value: fmtNum(optPeak) + " kW",
-        sub: "vs " + fmtNum(basePeak) + " kW baseline",
+        sub: "vs " + fmtNum(basePeak) + " kW current heating",
         delta: (peakPct >= 0 ? "↓ " : "↑ ") + Math.abs(peakPct).toFixed(1) + "% " + (peakPct >= 0 ? "lower peak" : "higher"),
         good: peakPct >= 0
       },
       {
         label: "Comfort violations",
         value: optViol + " hrs",
-        sub: "vs " + baseViol + " hrs baseline",
+        sub: "vs " + baseViol + " hrs current heating",
         delta: baseViol - optViol >= 0 ? "↓ " + (baseViol - optViol) + " fewer" : "↑ " + (optViol - baseViol) + " more",
         good: optViol <= baseViol
       },
@@ -650,8 +638,8 @@
       violationKey: "optimized_indoor_temp_c",
       series: [
         { key: "outdoor_temp_c", color: "--series-outdoor", dashed: true, label: "Outdoor" },
-        { key: "baseline_indoor_temp_c", color: "--series-baseline", label: "Baseline indoor" },
-        { key: "optimized_indoor_temp_c", color: "--series-optimized", label: "Optimized indoor" }
+        { key: "baseline_indoor_temp_c", color: "--series-baseline", label: "Current indoor" },
+        { key: "optimized_indoor_temp_c", color: "--series-optimized", label: "Smart indoor" }
       ]
     });
   }
@@ -665,8 +653,8 @@
       occupancyBand: true,
       yMinFloor: 0,
       series: [
-        { key: "baseline_heating_power_kw", color: "--series-baseline", label: "Baseline" },
-        { key: "optimized_heating_power_kw", color: "--series-optimized", label: "Optimized" }
+        { key: "baseline_heating_power_kw", color: "--series-baseline", label: "Current heating" },
+        { key: "optimized_heating_power_kw", color: "--series-optimized", label: "Smart heating" }
       ]
     });
   }
@@ -691,8 +679,8 @@
       occupancyBand: false,
       yMinFloor: 0,
       series: [
-        { key: "cum_baseline", color: "--series-baseline", label: "Baseline cumulative" },
-        { key: "cum_optimized", color: "--series-optimized", label: "Optimized cumulative" }
+        { key: "cum_baseline", color: "--series-baseline", label: "Current heating, cumulative" },
+        { key: "cum_optimized", color: "--series-optimized", label: "Smart heating, cumulative" }
       ]
     });
   }
@@ -705,12 +693,12 @@
       { key: "timestamp", label: "Time", fmt: fmtDateTime, align: "left" },
       { key: "occupied", label: "Occ.", fmt: function (v) { return v ? "●" : "—"; } },
       { key: "outdoor_temp_c", label: "Outdoor " + unitLabel(), fmt: function (v) { return toUnit(v).toFixed(1); } },
-      { key: "baseline_indoor_temp_c", label: "Base indoor " + unitLabel(), fmt: function (v) { return toUnit(v).toFixed(1); } },
-      { key: "optimized_indoor_temp_c", label: "Opt indoor " + unitLabel(), fmt: function (v) { return toUnit(v).toFixed(1); } },
-      { key: "baseline_heating_power_kw", label: "Base kW" },
-      { key: "optimized_heating_power_kw", label: "Opt kW" },
-      { key: "baseline_energy_kwh", label: "Base kWh" },
-      { key: "optimized_energy_kwh", label: "Opt kWh" }
+      { key: "baseline_indoor_temp_c", label: "Current indoor " + unitLabel(), fmt: function (v) { return toUnit(v).toFixed(1); } },
+      { key: "optimized_indoor_temp_c", label: "Smart indoor " + unitLabel(), fmt: function (v) { return toUnit(v).toFixed(1); } },
+      { key: "baseline_heating_power_kw", label: "Current kW" },
+      { key: "optimized_heating_power_kw", label: "Smart kW" },
+      { key: "baseline_energy_kwh", label: "Current kWh" },
+      { key: "optimized_energy_kwh", label: "Smart kWh" }
     ];
     var table = document.getElementById("dataTable");
     var thead = table.querySelector("thead");
@@ -788,7 +776,8 @@
       row.innerHTML =
         '<div class="b-id"><span class="b-name"></span><span class="b-code"></span></div>' +
         '<div class="b-type"><span class="b-type-tag"></span></div>' +
-        '<div class="b-temp"></div><div class="b-temp"></div><div class="b-temp"></div><div class="b-temp"></div>';
+        '<div class="b-temp"></div><div class="b-temp"></div><div class="b-temp"></div><div class="b-temp"></div>' +
+        '<div class="b-temp"></div><div class="b-temp"></div><div class="b-temp"></div>';
       row.querySelector(".b-name").textContent = b.name;
       row.querySelector(".b-code").textContent = b.code + " · " + b.type;
       row.querySelector(".b-type-tag").textContent = nf(b.floor_area_m2, 0) + " m² · " + b.year_built;
@@ -797,6 +786,7 @@
       cells[1].textContent = b.kwh_24h === null ? "—" : nf(b.kwh_24h, 0) + " kWh";
       cells[2].textContent = b.kwh_m2_24h === null ? "—" : nf(b.kwh_m2_24h, 3);
       cells[3].textContent = b.outdoor_c === null ? "—" : fmtTemp(b.outdoor_c);
+      b.forecast_kwh.forEach(function (v, i) { cells[4 + i].textContent = v === null ? "—" : nf(v, 0) + " kWh"; });
       row.addEventListener("click", function () { openDetail(b.id); });
       row.addEventListener("keydown", function (e) {
         if (e.key === "Enter" || e.key === " ") { e.preventDefault(); openDetail(b.id); }
