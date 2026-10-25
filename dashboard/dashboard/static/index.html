@@ -3,130 +3,58 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Building Heat Monitor</title>
+  <title>Playback console</title>
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
   <header class="top">
     <div>
-      <h1>Building heat monitor</h1>
-      <p class="sub">Replay of measured district-heating use. Times are UTC+1 all year.</p>
+      <h1>Playback console</h1>
+      <p class="sub">Controls the replay of the frozen data. Every display follows this clock. Times are UTC+1 all year.</p>
     </div>
-    <div class="clock" aria-live="off">
-      <div id="clock-time" class="clock-time">–</div>
-      <div><span id="clock-phase" class="badge">Not started</span> <span id="clock-progress" class="muted"></span></div>
-    </div>
+    <a class="link" href="/bms/" target="_blank" rel="noopener">Open the building display &rarr;</a>
   </header>
 
-  <section class="filters" aria-label="Replay controls and view">
-    <button id="play" type="button" class="primary">Play</button>
-    <button id="reset" type="button">Restart</button>
-    <label>Speed
-      <select id="speed">
-        <option value="1">1 hour / s</option>
-        <option value="6">6 hours / s</option>
-        <option value="24" selected>1 day / s</option>
-        <option value="72">3 days / s</option>
-        <option value="168">1 week / s</option>
-      </select>
-    </label>
-    <label>Chart range
-      <select id="range">
-        <option value="7">Last 7 days</option>
-        <option value="30">Last 30 days</option>
-        <option value="all" selected>Whole window</option>
-      </select>
-    </label>
-    <label class="forecast" id="forecast-label" title="The forecast service is not reachable">
-      <input id="forecast" type="checkbox" disabled> AI forecast made
-    </label>
-    <label class="forecast-h">
-      <select id="forecast-h" aria-label="How long before the hour the forecast was made" disabled>
-        <option value="1">1 h</option>
-        <option value="6">6 h</option>
-        <option value="24" selected>24 h</option>
-      </select> before
-    </label>
-    <span id="message" class="message" role="status"></span>
-  </section>
-
   <main>
-    <section class="card" aria-labelledby="buildings-h">
-      <h2 id="buildings-h">Buildings</h2>
-      <div class="table-wrap">
-        <table id="buildings">
-          <thead>
-            <tr>
-              <th scope="col">Building</th>
-              <th scope="col" class="num">Floor area (m²)</th>
-              <th scope="col" class="num">Heat now (kW)</th>
-              <th scope="col" class="num">Last 24 h (kWh)</th>
-              <th scope="col" class="num">Last 24 h (kWh/m²)</th>
-              <th scope="col" class="num">Outdoor (°C)</th>
-            </tr>
-          </thead>
-          <tbody></tbody>
-        </table>
+    <section class="card" aria-labelledby="clock-h">
+      <h2 id="clock-h">Replay clock</h2>
+      <div class="clock">
+        <div id="clock-time" class="clock-time">–</div>
+        <div><span id="clock-phase" class="badge">Not started</span> <span id="clock-progress" class="muted"></span></div>
       </div>
-      <p class="hint">Select a building to see its charts.</p>
+      <div class="bar" role="progressbar" aria-label="Position in the data window" aria-valuemin="0" aria-valuemax="100" id="bar"><div id="bar-fill"></div></div>
+      <p class="muted small" id="window"></p>
     </section>
 
-    <section class="card" aria-labelledby="chart-h">
-      <div class="charts" id="charts">
-        <h2 id="chart-h">Heat use, <span id="chart-building">–</span></h2>
-        <p class="muted unit">kW, hourly average <span id="forecast-legend" class="legend" hidden>· dashed: AI forecast <span id="forecast-legend-h"></span> before</span></p>
-        <svg id="chart-heat" role="img" aria-label="Heat use over time"></svg>
-        <p id="forecast-note" class="hint" hidden></p>
-        <h2 class="second">Outdoor temperature</h2>
-        <p class="muted unit">°C</p>
-        <svg id="chart-tout" role="img" aria-label="Outdoor temperature over time"></svg>
-        <div id="tooltip" class="tooltip" hidden></div>
-      </div>
-      <details class="table-view">
-        <summary>Show the last 24 hours as a table</summary>
-        <table id="recent">
-          <thead><tr><th scope="col">Time</th><th scope="col" class="num">Heat (kW)</th><th scope="col" class="num">Outdoor (°C)</th></tr></thead>
-          <tbody></tbody>
-        </table>
-      </details>
-    </section>
-
-    <section class="card" aria-labelledby="twin-h">
-      <h2 id="twin-h">Digital twin: simulated classroom</h2>
-      <p class="warn">Simulation, not measurement. One 60 m² classroom with assumed parameters, run on the weather of the selected building. Not the building's real heat use.</p>
-      <div class="twin-controls">
-        <label>Start (Monday)
-          <input id="twin-start" type="date">
-        </label>
-        <label>Days
-          <select id="twin-days">
-            <option value="1">1</option>
-            <option value="3">3</option>
-            <option value="5" selected>5</option>
-            <option value="7">7</option>
+    <section class="card" aria-labelledby="controls-h">
+      <h2 id="controls-h">Controls</h2>
+      <div class="controls">
+        <button id="play" type="button" class="primary">Play</button>
+        <button id="reset" type="button">Restart</button>
+        <label>Speed
+          <select id="speed">
+            <option value="1">1 hour / s</option>
+            <option value="6">6 hours / s</option>
+            <option value="24">1 day / s</option>
+            <option value="72">3 days / s</option>
+            <option value="168">1 week / s</option>
+            <option value="720">30 days / s</option>
           </select>
         </label>
-        <button id="twin-run" type="button" class="primary">Run simulation</button>
-        <span id="twin-message" class="message" role="status"></span>
+        <span id="message" class="message" role="status"></span>
       </div>
-      <div id="twin-out" hidden>
-        <div class="table-wrap">
-          <table id="twin-summary">
-            <thead><tr><th scope="col">5-day totals</th><th scope="col" class="num">Legacy</th><th scope="col" class="num">Combined</th></tr></thead>
-            <tbody></tbody>
-          </table>
-        </div>
-        <h2 class="second">Room temperature</h2>
-        <p class="muted unit">°C, 10-minute values</p>
-        <svg id="chart-twin-temp" role="img" aria-label="Simulated room temperature, legacy and combined controller"></svg>
-        <h2 class="second">Heat power (radiator + ventilation coil)</h2>
-        <p class="muted unit">kW, 10-minute values</p>
-        <svg id="chart-twin-heat" role="img" aria-label="Simulated heat power, legacy and combined controller"></svg>
-        <p id="twin-note" class="hint"></p>
-      </div>
+      <p class="hint">Pause, play, restart and speed apply to every open display at once. Restart goes back to the first hour of the window and plays.</p>
+    </section>
+
+    <section class="card" aria-labelledby="services-h">
+      <h2 id="services-h">Services</h2>
+      <ul class="services">
+        <li><span id="svc-feed" class="dot"></span> Replay feed <span class="muted">(heat and weather)</span></li>
+        <li><span id="svc-twin" class="dot"></span> Digital twin <span class="muted">(simulated classroom)</span></li>
+        <li><span id="svc-forecast" class="dot"></span> AI forecast <span class="muted">(1, 6 and 24 h)</span></li>
+      </ul>
     </section>
   </main>
   <script src="app.js"></script>
-  <script src="twin.js"></script>
 </body>
 </html>

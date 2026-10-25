@@ -118,3 +118,19 @@ def test_twin_errors_pass_through():
                               twin_url="http://twin", twin_transport=httpx.MockTransport(bad)))
     r = c.get("/api/twin/compare", params={"start": "2000-01-01"})
     assert r.status_code == 422 and r.json()["detail"] == "outside the window"
+
+
+def test_twin_status_follows_the_service():
+    def make_twin(handler):
+        return TestClient(create_app("http://feed", transport=httpx.MockTransport(fake_feed),
+                                     twin_url="http://twin", twin_transport=httpx.MockTransport(handler)))
+    def down(request):
+        raise httpx.ConnectError("refused")
+    assert make_twin(lambda request: httpx.Response(200, json={"status": "ok"})).get("/api/twin/status").json() == {"available": True}
+    assert make_twin(down).get("/api/twin/status").json() == {"available": False}
+
+
+def test_console_page_is_served_with_its_script():
+    c = make()
+    assert "Playback console" in c.get("/").text
+    assert c.get("/app.js").status_code == 200 and c.get("/twin.js").status_code == 404

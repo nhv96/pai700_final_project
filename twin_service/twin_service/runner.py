@@ -49,6 +49,7 @@ def _series(records: list[Record]) -> dict[str, list]:
         "radiator_kW": [round(r.q_radiator_W / 1000.0, 3) for r in rows],
         "coil_kW": [round(r.q_coil_W / 1000.0, 3) for r in rows],
         "supply_air_C": [round(r.t_supply_air_C, 2) for r in rows],
+        "occupants": [r.occupants for r in rows],
     }
 
 
@@ -77,5 +78,6 @@ def compare(weather: FeedWeather, params: TwinParams, start: datetime, days: int
     }
     result["setpoint_C"] = params.comfort.setpoint_C
     result["purge_trigger_C"] = params.ventilation.purge_trigger_C
+    result["comfort_band_C"] = [params.comfort.lower_limit_C, params.comfort.discomfort_above_C]
     result["note"] = NOTE
     return result

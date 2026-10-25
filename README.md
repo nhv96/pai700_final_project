@@ -12,7 +12,7 @@ The research solution has three parts that work together. This repository now co
 |---|---|---|
 | **Digital twin (DT)** | A simulation of one school classroom (heating and ventilation) with a 60 s step. It gives us a safe place to test control ideas without touching a real building. | Simulation loop, radiator, ventilation with air-handling unit, sensors, schedule, our own two-node heat model (assumed parameters), the legacy controller and two better controllers exist (`twin/`). It runs on feed weather as a service (`twin_service/`). |
 | **AI model** | Predicts near-future heat load (`HtTot`, hourly, whole building) from past heat, weather and calendar. | Working: ETL, baselines, LightGBM, GRU, final test, saved models and a forecast service (`etl/`, `modeling/`, `models/`, `forecast_service/`). The twin's controllers do not use it (decision: benchmark only); the dashboard shows it, also scaled to 60 m² next to the twin run. |
-| **Building-management dashboard** | One central place to see the buildings, their state, the AI forecasts and the DT results. | First version works (`dashboard/`): replay controls, buildings table, heat and outdoor-temperature charts, and a digital-twin panel (legacy vs combined controller, simulated). The AI forecast overlay works (dashed line, from the forecast service). Status colours are not built yet. |
+| **Building-management dashboard** | One central place to see the buildings, their state, the AI forecasts and the DT results. | Works (`dashboard/`): the teammate's management display is served at `/bms/` and shows the replayed buildings, a simulated classroom (legacy vs combined controller, last completed days) and the AI forecast. A playback console at `/` controls the shared replay clock (play, pause, restart, speed). Everything shown comes from our API; there are no cost, CO₂, AHU or alarm data because the dataset has none. |
 
 How they fit together: the dataset is the common ground. The AI model learns from it, the DT replays the same weather, and the dashboard shows what both produce.
 
@@ -92,10 +92,10 @@ FEED_DATA=../frozen/oslo_window_v1.parquet uv run uvicorn --factory feed.api:cre
 
 ### Dashboard
 
-Own `pyproject.toml` and Dockerfile; details in `dashboard/README.md`. It only talks to the replay feed over HTTP.
+Own `pyproject.toml` and Dockerfile; details in `dashboard/README.md`. It talks to the other services over HTTP and keeps the shared replay clock. Console: `http://localhost:8000/`, building display: `http://localhost:8000/bms/`. Tests: `cd dashboard && uv run pytest` (server) and `node --test tests/js/*.test.mjs` (the display's data adapter).
 
 ```bash
-docker compose up --build            # feed on :8001, twin service on :8002, dashboard on http://localhost:8000
+docker compose up --build            # feed :8001, twin :8002, forecast :8003, dashboard http://localhost:8000
 ```
 
 ### Forecast service
@@ -146,8 +146,8 @@ A full `run_gbm` takes about 40 minutes. If `uv run` picks up the wrong packages
 | `twin/simulation.py` | `DigitalTwin` 60 s loop, `build_default_twin()` |
 | `feed/` | frozen-window freeze command and HTTP replay service (own project, own Dockerfile) |
 | `frozen/` | the frozen dataset window + SHA-256 checksum |
-| `dashboard/` | building-heat dashboard: small FastAPI server + plain HTML/JS page (own project, own Dockerfile) |
-| `docker-compose.yml` | runs the feed and the dashboard together |
+| `dashboard/` | playback console (`/`) and building display (`/bms/`): small FastAPI server with the shared replay clock + plain HTML/JS pages (own project, own Dockerfile) |
+| `docker-compose.yml` | runs the feed, twin, forecast service and dashboard together |
 | `etl/preprocess_htot.py` | silver and gold layers from the raw files |
 | `etl/windows.py` | time splits and forecasting windows |
 | `modeling/` | baselines, metrics, LightGBM (`gbm.py`), GRU (`gru.py`), tuning, day types, features, final test (`final.py`), model export and loading (`export.py`, `predictor.py`) |
@@ -167,7 +167,7 @@ The twin already runs our own `TwoNodeRoomModel`. Another model only has to impl
 
 1. Calibrate the heat model with indoor temperature and plant data from the client (see `docs/oslo-data-limits.md`).
 2. (Decided 2026-10-20) The AI forecast is a benchmark only; the twin's controllers do not use it. Not planned: connecting it to optimal start/stop.
-3. Grow the dashboard: status colours, and the forecast for the next hours beyond the replay clock.
+3. Grow the display: the forecast for the next hours beyond the replay clock; a seek/jump control in the console.
 4. Optional: check what `HtTot` contains for each building (hot water share) to judge the benchmark better.
 
 ## Results so far (AI model)

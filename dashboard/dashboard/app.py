@@ -6,22 +6,38 @@ and adding sources later (AI forecasts, twin output) means adding routes here, n
   /api/buildings, /api/readings, /api/weather-forecast, /api/stream   forwarded to the feed unchanged
   /api/forecast/status                                                is the forecast service reachable?
   /api/forecast/series, /api/forecast/model                           forwarded to the forecast service (FORECAST_URL)
+  /api/status                                                         building status from heat use (computed here)
+  /api/twin/status                                                    is the twin service reachable?
   /api/twin/compare                                                   forwarded to the twin service (TWIN_URL)
+  /api/playback, /api/playback/events                                 the shared replay clock: state, and its server-sent events
+  POST /api/playback/play|pause|restart|speed                         control the shared clock
+  /bms/                                                               the building-management display (static, follows the clock)
 
 Run:  FEED_URL=http://localhost:8001 TWIN_URL=http://localhost:8002 FORECAST_URL=http://localhost:8003 uvicorn --factory dashboard.app:create_app --port 8000
 """
+import asyncio
 import os
 from contextlib import asynccontextmanager
+from datetime import datetime, timedelta
 from pathlib import Path
 
 import httpx
 from fastapi import FastAPI, HTTPException, Request
+from pydantic import BaseModel
 from fastapi.responses import Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from starlette.background import BackgroundTask
 
+from dashboard.playback import Playback
+from dashboard.status import DAY_H, EXPECTED_HORIZON, HISTORY_DAYS, HORIZONS, assess, summarize
+
 STATIC = Path(__file__).parent / "static"
+ORDER = {"alert": 0, "watch": 1, "no_data": 2, "ok": 3}
 FEED_ENDPOINTS = {"buildings", "readings", "weather-forecast", "stream"}
+
+
+class SpeedBody(BaseModel):
+    speed: float
 
 
 FORECAST_ENDPOINTS = {"series": "/forecast/series", "model": "/model"}
@@ -48,6 +64,93 @@ def create_app(feed_url: str | None = None,
 
     app = FastAPI(title="PAI700 dashboard", lifespan=lifespan)
 
+    playback: Playback | None = None
+
+    async def get_playback() -> Playback:
+        """The shared clock, created on first use because it needs the window bounds from the feed."""
+        nonlocal playback
+        if playback is None:
+            try:
+                resp = await client.get("/buildings", timeout=10.0)
+                resp.raise_for_status()
+                w = resp.json()["window"]
+            except (httpx.HTTPError, KeyError, ValueError):
+                raise HTTPException(502, f"the replay feed at {feed_url} is not reachable")
+            playback = Playback(w["first"], w["replay_start"], w["last"])
+        return playback
+
+    @app.get("/api/playback")
+    async def playback_state():
+        return (await get_playback()).state()
+
+    @app.get("/api/playback/events")
+    async def playback_events():
+        pb = await get_playback()
+        return StreamingResponse(pb.events(), media_type="text/event-stream",
+                                 headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
+
+    @app.post("/api/playback/speed")
+    async def playback_speed(body: SpeedBody):
+        pb = await get_playback()
+        try:
+            pb.set_speed(body.speed)
+        except ValueError as e:
+            raise HTTPException(422, str(e))
+        return pb.state()
+
+    @app.post("/api/playback/{action}")
+    async def playback_action(action: str):
+        pb = await get_playback()
+        if action not in ("play", "pause", "restart"):
+            raise HTTPException(404, f"unknown playback action: {action}")
+        getattr(pb, action)()
+        return pb.state()
+
+    async def forecast_points(building: int, first: datetime, last: datetime, horizons: str) -> dict:
+        """Forecast series of one building as {horizon: {target_time: Wh}}; {} when the service cannot answer."""
+        try:
+            resp = await forecast.get("/forecast/series", params={
+                "from": first.isoformat(), "until": last.isoformat(), "building": building, "horizons": horizons})
+            resp.raise_for_status()
+            series = resp.json()["series"]
+        except (httpx.HTTPError, KeyError, ValueError):
+            return {}
+        return {int(h): {datetime.fromisoformat(p["target_time"]): p["wh"] for p in pts} for h, pts in series.items()}
+
+    @app.get("/api/status")
+    async def building_status():
+        """Per-building status at the shared clock's hour, from heat use only (see dashboard/status.py)."""
+        pb = await get_playback()
+        position = pb.state()["position"]
+        if position is None:
+            return {"as_of": None, "summary": summarize([]), "buildings": [], "note": "The replay has not started."}
+        now = datetime.fromisoformat(position)
+        first = max(now - timedelta(days=HISTORY_DAYS), pb.first_ts)
+        try:
+            resp = await client.get("/readings", params={"from": first.isoformat(), "until": now.isoformat()})
+            resp.raise_for_status()
+            rows = resp.json()
+        except (httpx.HTTPError, ValueError):
+            raise HTTPException(502, f"the replay feed at {feed_url} is not reachable")
+        history: dict[int, dict] = {}
+        for r in rows:
+            history.setdefault(r["building_id"], {})[datetime.fromisoformat(r["timestamp"])] = (r["HtTot"], r["Tout"])
+
+        async def one(building: int, hist: dict) -> dict:
+            past, ahead = await asyncio.gather(
+                forecast_points(building, now - timedelta(hours=DAY_H - 1 + EXPECTED_HORIZON), now - timedelta(hours=EXPECTED_HORIZON),
+                                str(EXPECTED_HORIZON)),
+                forecast_points(building, now, now, ",".join(map(str, HORIZONS))))
+            return {"building_id": building, **assess(
+                now, hist, past.get(EXPECTED_HORIZON, {}),
+                {h: next(iter(pts.values())) for h, pts in ahead.items() if pts})}
+
+        buildings = await asyncio.gather(*(one(b, h) for b, h in sorted(history.items())))
+        buildings = sorted(buildings, key=lambda b: (ORDER[b["status"]], b["building_id"]))
+        return {"as_of": position, "summary": summarize(buildings), "buildings": buildings,
+                "note": "Judged on heat use only: there is no indoor temperature in the data. "
+                        "Expected heat = the AI forecast, or the building's own recent days where the forecast is missing."}
+
     @app.get("/api/forecast/status")
     async def forecast_status():
         try:
@@ -64,6 +167,13 @@ def create_app(feed_url: str | None = None,
         except httpx.HTTPError:
             raise HTTPException(502, f"the forecast service at {forecast_url} is not reachable")
         return Response(resp.content, status_code=resp.status_code, media_type=resp.headers.get("content-type"))
+
+    @app.get("/api/twin/status")
+    async def twin_status():
+        try:
+            return {"available": (await twin.get("/health", timeout=2.0)).status_code == 200}
+        except httpx.HTTPError:
+            return {"available": False}
 
     @app.get("/api/twin/compare")
     async def twin_compare(request: Request):
