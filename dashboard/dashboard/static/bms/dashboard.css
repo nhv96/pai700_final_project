@@ -464,6 +464,31 @@ table.data-table th { color: var(--ink-muted); font-weight: 600; font-size: 11px
   box-shadow: inset 4px 0 0 var(--critical);
 }
 
+/* status from /api/status: alert reuses .attention colours, watch uses the warning colour */
+.b-row.st-alert { background: var(--critical-wash); box-shadow: inset 4px 0 0 var(--critical); }
+.b-row.st-alert .b-name, .b-row.st-alert .b-status-line { color: var(--critical); }
+.b-row.st-watch { background: var(--warning-wash); box-shadow: inset 4px 0 0 var(--warning); }
+.b-row.st-watch .b-status-line { color: var(--warning); }
+.b-row.st-no_data { box-shadow: inset 4px 0 0 var(--ink-muted); }
+.b-status-line { font-size: 11px; font-weight: 600; color: var(--ink-muted); margin-top: 1px; white-space: normal; }
+.status-bar {
+  display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 16px; margin-bottom: 10px;
+  padding: 9px 14px; border-radius: var(--radius-md); border: 1px solid var(--border);
+  background: var(--surface); font-size: 13px; color: var(--ink-secondary);
+}
+.status-bar.alert { background: var(--critical-wash); border-color: var(--critical); }
+.status-bar.watch { background: var(--warning-wash); border-color: var(--warning); }
+.status-bar .sb-count strong { font-family: "IBM Plex Mono"; color: var(--ink); }
+.status-bar .sb-count.alert strong { color: var(--critical); }
+.status-bar .sb-count.watch strong { color: var(--warning); }
+.status-bar .sb-note { font-size: 11.5px; color: var(--ink-muted); flex-basis: 100%; }
+.status-reason { font-size: 13px; padding: 6px 10px; margin-bottom: 6px; border-radius: 6px; background: var(--surface-2); color: var(--ink-secondary); }
+.status-reason.alert { background: var(--critical-wash); color: var(--critical); }
+.status-reason.watch { background: var(--warning-wash); color: var(--warning); }
+.detail-status.alert { color: #ff6b6b; } .detail-status.alert::before { background: #ff6b6b; }
+.detail-status.watch { color: #e0a634; } .detail-status.watch::before { background: #e0a634; }
+.detail-status.no_data { color: #9aa4b2; } .detail-status.no_data::before { background: #9aa4b2; }
+
 .b-row:not(.b-head) { cursor: pointer; }
 .b-row:not(.b-head):hover { background: var(--surface-2); }
 .b-row.attention:hover { background: rgba(194,59,59,0.16); }

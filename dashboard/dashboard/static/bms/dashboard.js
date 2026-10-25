@@ -762,13 +762,33 @@
     }).join("");
   }
 
+  // Status comes from the server (/api/status): ok / watch / alert / no_data, each with reasons in plain words.
+  var STATUS_RANK = { alert: 0, watch: 1, no_data: 2, ok: 3 };
+  var STATUS_LABEL = { alert: "Alert", watch: "Watch", no_data: "No data", ok: "OK" };
+
+  function statusRank(b) { return b.status ? STATUS_RANK[b.status.status] : 4; }
+
+  function renderStatusBar() {
+    var bar = document.getElementById("statusBar");
+    var st = DATA.status || {};
+    if (st.error) { bar.className = "status-bar unknown"; bar.textContent = "Status unavailable: " + st.error; return; }
+    if (!st.summary) { bar.className = "status-bar unknown"; bar.textContent = "Status appears once the replay has started."; return; }
+    var sm = st.summary;
+    var worst = sm.alert ? "alert" : sm.watch ? "watch" : "ok";
+    bar.className = "status-bar " + worst;
+    bar.innerHTML = ["alert", "watch", "no_data", "ok"].map(function (k) {
+      return '<span class="sb-count ' + k + '"><strong>' + sm[k] + '</strong> ' + STATUS_LABEL[k].toLowerCase() + '</span>';
+    }).join("") + '<span class="sb-note">' + escapeHtml(st.note || "") + '</span>';
+  }
+
   function renderBuildings() {
     renderSummary();
+    renderStatusBar();
     var container = document.getElementById("buildingList");
     Array.prototype.slice.call(container.querySelectorAll(".b-row:not(.b-head)")).forEach(function (el) { el.remove(); });
-    DATA.buildings.forEach(function (b) {
+    DATA.buildings.slice().sort(function (a, b) { return statusRank(a) - statusRank(b) || a.building_id - b.building_id; }).forEach(function (b) {
       var row = document.createElement("div");
-      row.className = "b-row";
+      row.className = "b-row" + (b.status && b.status.status !== "ok" ? " st-" + b.status.status : "");
       row.setAttribute("data-id", b.id);
       row.setAttribute("tabindex", "0");
       row.setAttribute("role", "button");
@@ -780,6 +800,12 @@
         '<div class="b-temp"></div><div class="b-temp"></div><div class="b-temp"></div>';
       row.querySelector(".b-name").textContent = b.name;
       row.querySelector(".b-code").textContent = b.code + " · " + b.type;
+      if (b.status && b.status.status !== "ok") {
+        var line = document.createElement("span");
+        line.className = "b-status-line";
+        line.textContent = STATUS_LABEL[b.status.status] + (b.status.reasons.length ? ": " + b.status.reasons[0].message : "");
+        row.querySelector(".b-id").appendChild(line);
+      }
       row.querySelector(".b-type-tag").textContent = nf(b.floor_area_m2, 0) + " m² · " + b.year_built;
       var cells = row.querySelectorAll(".b-temp");
       cells[0].textContent = b.heat_kw === null ? "—" : nf(b.heat_kw, 1) + " kW";
@@ -832,8 +858,9 @@
     document.getElementById("detailName").textContent = b.name;
     document.getElementById("detailCode").textContent = b.code + " · " + b.type;
     var statusEl = document.getElementById("detailStatus");
-    statusEl.className = "detail-status normal";
-    statusEl.textContent = DATA.clock && DATA.clock.position ? "REPLAY " + fmtDateTime(DATA.clock.position).toUpperCase() : "REPLAY NOT STARTED";
+    var stat = b.status ? b.status.status : "ok";
+    statusEl.className = "detail-status " + (stat === "ok" ? "normal" : stat);
+    statusEl.textContent = (b.status ? STATUS_LABEL[stat].toUpperCase() + " · " : "") + (DATA.clock && DATA.clock.position ? "REPLAY " + fmtDateTime(DATA.clock.position).toUpperCase() : "REPLAY NOT STARTED");
 
     var metrics = [
       { label: "HEAT NOW", value: b.heat_kw === null ? "—" : nf(b.heat_kw, 1) + " kW" },
@@ -850,7 +877,7 @@
       ["Year built", String(b.year_built)],
       ["Outdoor temperature", b.outdoor_c === null ? "—" : fmtTemp(b.outdoor_c)]
     ];
-    document.getElementById("detailTabContent").innerHTML =
+    document.getElementById("detailTabContent").innerHTML = statusSection(b) +
       '<div class="detail-section"><div class="detail-section-title">HEAT USE — LAST 24 HOURS (kW)</div>' +
       '<div class="energy-graph" id="energyGraphWrap"></div></div>' +
       '<div class="detail-section"><div class="detail-section-title">BUILDING</div>' +
@@ -859,6 +886,28 @@
           '<span class="room-right"><span class="room-temp">' + escapeHtml(f[1]) + '</span></span></div>';
       }).join("") + '</div>';
     renderEnergySpark(b);
+  }
+
+  function pct(x) { return x === null || x === undefined ? "—" : (x > 0 ? "+" : "") + Math.round(x * 100) + " %"; }
+
+  function statusSection(b) {
+    var s = b.status;
+    if (!s) return "";
+    var reasons = s.reasons.length ? s.reasons.map(function (r) {
+      return '<div class="status-reason ' + r.level + '">' + escapeHtml(r.message) + '</div>';
+    }).join("") : '<div class="status-reason ok">Heat use is as expected.</div>';
+    var basis = { forecast: "the AI forecast", baseline: "this building's own recent days", mixed: "the AI forecast and this building's own recent days" }[s.basis];
+    var rows = [
+      ["Heat now / expected", nf(s.actual_kw, 1) + " kW / " + (s.expected_kw === null ? "—" : nf(s.expected_kw, 1) + " kW")],
+      ["Versus expected, last 6 h / 24 h", pct(s.excess_6h) + " / " + pct(s.excess_24h)],
+      ["Forecast vs highest load of 14 days", s.peak_ratio === null ? "—" : Math.round(s.peak_ratio * 100) + " %"]
+    ];
+    return '<div class="detail-section"><div class="detail-section-title">STATUS</div>' + reasons +
+      rows.map(function (r) {
+        return '<div class="room-row"><span class="room-name">' + escapeHtml(r[0]) + '</span>' +
+          '<span class="room-right"><span class="room-temp">' + escapeHtml(r[1]) + '</span></span></div>';
+      }).join("") +
+      (basis ? '<p class="hint">Expected heat comes from ' + basis + '. Judged on heat use only.</p>' : "") + '</div>';
   }
 
   function renderEnergySpark(b) {

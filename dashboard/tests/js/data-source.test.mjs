@@ -43,6 +43,8 @@ function setup({ position, fail = {} }) {
       const until = Date.parse(new URL(url, "http://x").searchParams.get("until") + ":00Z") - 3600e3;   // data time -> epoch
       return json(Array.from({ length: 24 }, (_, i) => ({ timestamp: new Date(until - (23 - i) * 3600e3).toISOString(), building_id: 1, HtTot: 2000, Tout: 5 })));
     }
+    if (url.startsWith("/api/status")) return json({ as_of: position, summary: { alert: 1, watch: 0, ok: 0, no_data: 0 }, note: "n",
+      buildings: [{ building_id: 1, status: "alert", reasons: [{ code: "excess_6h", level: "alert", message: "too hot" }] }] });
     if (url.startsWith("/api/forecast/model")) return json({ version: "ai_v1", train_end: "2022-03-01" });
     if (url.startsWith("/api/forecast/series")) return json({ note: "n", series: { 1: [{ wh: 1000 }], 6: [{ wh: 6000 }], 24: [{ wh: 24000 }] } });
     if (url.startsWith("/api/twin/compare")) {
@@ -173,4 +175,23 @@ test("a restart of the clock drops the simulated days that are now in the future
   t.push("2022-09-24T00:00:00+01:00");
   await t.flush();
   assert.deepEqual(t.last().timeseries, []);
+});
+
+test("each building carries its status from /api/status", async () => {
+  const t = setup({ position: "2022-11-08T09:00:00+01:00" });
+  await t.flush();
+  const d = t.last();
+  assert.equal(d.buildings[0].status.status, "alert");
+  assert.equal(d.buildings[0].status.reasons[0].message, "too hot");
+  assert.deepEqual(d.status.summary, { alert: 1, watch: 0, ok: 0, no_data: 0 });
+  assert.equal(d.status.error, null);
+});
+
+test("a status failure is reported, the rest still works", async () => {
+  const t = setup({ position: "2022-11-08T09:00:00+01:00", fail: { "/api/status": "forecast down" } });
+  await t.flush();
+  const d = t.last();
+  assert.equal(d.buildings[0].status, null);
+  assert.equal(d.status.error, "forecast down");
+  assert.equal(d.buildings[0].heat_kw, 2);
 });

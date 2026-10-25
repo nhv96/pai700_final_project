@@ -6,6 +6,7 @@
 //   /api/readings            heat and weather of the last 24 hours, never later than the clock
 //   /api/twin/compare        simulated classroom, legacy vs combined controller, for the last N COMPLETED days
 //   /api/forecast/*          AI heat forecast of every building, made at the clock's hour
+//   /api/status              per-building status (ok / watch / alert / no_data) from heat use, judged at the clock's hour
 //
 // Usage: BmsSource.start({ onData, onStatus }); BmsSource.select({ building, days }).
 // onData(data) is called after every refresh; data.clock.position is null until the replay has been started.
@@ -26,6 +27,7 @@
   var selection = { building: null, days: 3 };
   var twin = { key: null, body: null, loading: null, error: null };
   var forecast = { key: null, byBuilding: {}, note: null, model: null, modelTried: false };
+  var status = { key: null, body: null, error: null };
   var refreshing = false, again = false, timer = null;
 
   // epoch seconds <-> the data's fixed UTC+1 wall clock ("YYYY-MM-DDTHH:MM")
@@ -67,6 +69,7 @@
         Object.keys(readings).forEach(function (k) { readings[k] = []; });
         forecast.key = null; forecast.byBuilding = {};
         twin.key = null; twin.body = null; twin.error = null;
+        status.key = null; status.body = null; status.error = null;
       }
       schedule();
     });
@@ -88,7 +91,7 @@
   function refresh() {
     if (refreshing) { again = true; return; }
     refreshing = true;
-    var job = clock && clock.position ? Promise.all([loadReadings(), loadForecast()]) : Promise.resolve();
+    var job = clock && clock.position ? Promise.all([loadReadings(), loadForecast(), loadStatus()]) : Promise.resolve();
     job.then(function () {
       if (clock && clock.position) loadTwin();          // slow: runs on its own and emits when it is done
       emit();
@@ -135,6 +138,18 @@
         });
       }));
     }).then(function () { forecast.key = key; });
+  }
+
+  // Status of every building, computed by the server at the clock's hour. If it fails the page still works, just
+  // without status (status.error says why).
+  function loadStatus() {
+    var key = clock.position;
+    if (status.key === key) return Promise.resolve();
+    return getJson("/api/status").then(function (body) {
+      status.body = body; status.error = null;
+    }, function (e) {
+      status.body = null; status.error = e.message;
+    }).then(function () { status.key = key; });
   }
 
   // ---------- digital twin: the last N completed days before the clock ----------
@@ -202,11 +217,15 @@
   // ---------- the data object ----------
 
   function buildData() {
+    var statusById = {};
+    ((status.body && status.body.buildings) || []).forEach(function (s) { statusById[s.building_id] = s; });
     var buildings = info.buildings.map(function (b) {
       var rows = readings[b.building_id] || [];
       var n = rows.length;
       var kwh24 = n >= 24 ? rows.reduce(function (a, r) { return a + r.heat_kw; }, 0) : null;   // one reading = one hour
+      var st = statusById[b.building_id];
       return {
+        status: st || null,
         id: String(b.building_id), building_id: b.building_id,
         code: "B" + b.building_id, name: "Building " + b.building_id, type: "School",
         floor_area_m2: b.floor_area, year_built: b.year_of_construction,
@@ -230,6 +249,8 @@
       outdoor_c: sel ? sel.outdoor_c : null,
       timeseries: [],
       twin: null,
+      status: { as_of: status.body ? status.body.as_of : null, summary: status.body ? status.body.summary : null,
+                note: status.body ? status.body.note : null, error: status.error },
       forecast: forecast.key === null ? null : { hours: FORECAST_HOURS, origin: forecast.key, note: forecast.note, model: forecast.model }
     };
     if (twin.body) {
