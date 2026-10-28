@@ -105,12 +105,32 @@
   }
   BmsSource.start({
     onData: onSourceData,
+    onClock: renderClock,
     onStatus: function (s) {
       var el = document.getElementById("subtitle");
       if (s.error) el.textContent = s.error;
       else if (typeof s.twin === "string") document.getElementById("scenarioScope").dataset.busy = s.twin;
     }
   });
+  // Every time on this page is the data's own time: UTC+1 all year, no daylight saving, whatever the browser's time
+  // zone is. A string without an offset ("2022-11-08T09:00") is already in that time.
+  var DATA_TZ = "Etc/GMT-1";
+  function dataDate(iso) {
+    return new Date(/(Z|[+-]\d\d:?\d\d)$/.test(iso) ? iso : iso + "+01:00");
+  }
+
+  // The replay clock in the top bar: the same shared clock the playback console controls, shown as the data's own
+  // time (UTC+1, no daylight saving) whatever the browser's time zone is. The replay moves in whole hours.
+  var CLOCK_FORMAT = { timeZone: DATA_TZ, weekday: "short", day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit", hour12: false };
+  function renderClock(c) {
+    var chip = document.getElementById("clockChip");
+    var time = document.getElementById("clockTime"), state = document.getElementById("clockState");
+    var mode = !c || !c.started ? "idle" : c.finished ? "finished" : c.playing ? "playing" : "paused";
+    time.textContent = c && c.position ? dataDate(c.position).toLocaleString(undefined, CLOCK_FORMAT) : "Not started";
+    state.textContent = { idle: "", playing: "playing · " + (c && c.speed) + " h/s", paused: "paused", finished: "finished" }[mode];
+    chip.className = "clock-chip " + mode;
+  }
+
   function setLiveWeather(c) {
     var text = typeof c === "number" ? fmtTemp(c, 0) : "—";
     document.getElementById("weatherVal").textContent = text;
@@ -119,13 +139,12 @@
   }
 
   function fmtDate(iso) {
-    var d = new Date(iso);
-    return d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+    return dataDate(iso).toLocaleDateString(undefined, { timeZone: DATA_TZ, month: "short", day: "numeric" });
   }
   function fmtDateTime(iso) {
-    var d = new Date(iso);
-    return d.toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" }) +
-      ", " + d.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
+    var d = dataDate(iso);
+    return d.toLocaleDateString(undefined, { timeZone: DATA_TZ, weekday: "short", month: "short", day: "numeric" }) +
+      ", " + d.toLocaleTimeString(undefined, { timeZone: DATA_TZ, hour: "2-digit", minute: "2-digit" });
   }
   function escapeHtml(s) {
     var div = document.createElement("div");
@@ -483,9 +502,9 @@
     var dayBoundaries = [];
     var lastDay = null;
     rows.forEach(function (r, i) {
-      var d = new Date(r.timestamp);
-      var dayKey = d.getFullYear() + "-" + d.getMonth() + "-" + d.getDate();
-      if (dayKey !== lastDay && d.getHours() === 0) {
+      var d = dataDate(r.timestamp);
+      var dayKey = r.timestamp.slice(0, 10);                       // the data's own date, not the browser's
+      if (dayKey !== lastDay && r.timestamp.slice(11, 13) === "00") {
         lastDay = dayKey;
         dayBoundaries.push({ i: i, d: d });
       } else if (dayKey !== lastDay) {
@@ -509,7 +528,7 @@
         tick.setAttribute("x", lx);
         tick.setAttribute("y", height - 6);
         tick.setAttribute("text-anchor", "start");
-        tick.textContent = b.d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+        tick.textContent = b.d.toLocaleDateString(undefined, { timeZone: DATA_TZ, month: "short", day: "numeric" });
         svg.appendChild(tick);
       }
     });

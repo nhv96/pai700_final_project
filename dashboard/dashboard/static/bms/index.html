@@ -57,6 +57,11 @@
         <h1 id="pageTitle">Control panel</h1>
       </div>
       <div class="topbar-right">
+        <span class="clock-chip" id="clockChip" role="timer" aria-label="Replay clock">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15.5 14"/></svg>
+          <strong id="clockTime">—</strong>
+          <span class="clock-state" id="clockState"></span>
+        </span>
         <span class="weather-chip" id="weatherChip">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M17.5 18a4.5 4.5 0 0 0 0-9 6 6 0 0 0-11.5 2 4 4 0 0 0 .5 7.9h11"/></svg>
           Outdoor · <strong id="weatherVal">—</strong>

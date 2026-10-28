@@ -8,7 +8,8 @@
 //   /api/forecast/*          AI heat forecast of every building, made at the clock's hour
 //   /api/status              per-building status (ok / watch / alert / no_data) from heat use, judged at the clock's hour
 //
-// Usage: BmsSource.start({ onData, onStatus }); BmsSource.select({ building, days }).
+// Usage: BmsSource.start({ onData, onStatus, onClock }); BmsSource.select({ building, days }).
+// onClock(clock) is called at once whenever the shared clock changes (play, pause, speed, every new hour), without waiting for a refresh.
 // onData(data) is called after every refresh; data.clock.position is null until the replay has been started.
 (function () {
   "use strict";
@@ -21,6 +22,7 @@
 
   var onData = function () {};
   var onStatus = function () {};
+  var onClock = function () {};
   var info = null;                      // /api/buildings
   var clock = null;                     // /api/playback
   var readings = {};                    // building id -> [{t, heat_kw, tout}] for the last 24 hours
@@ -48,9 +50,11 @@
   function start(handlers) {
     onData = handlers.onData || onData;
     onStatus = handlers.onStatus || onStatus;
+    onClock = handlers.onClock || onClock;
     Promise.all([getJson("/api/buildings"), getJson("/api/playback")]).then(function (res) {
       info = res[0];
       clock = res[1];
+      onClock(clock);
       selection.building = info.buildings.length ? info.buildings[0].building_id : null;
       info.buildings.forEach(function (b) { readings[b.building_id] = []; });
       openEvents();
@@ -65,6 +69,7 @@
     es.addEventListener("state", function (ev) {
       var prev = clock;
       clock = JSON.parse(ev.data);
+      onClock(clock);
       if (prev && prev.position && clock.position && epoch(clock.position) < epoch(prev.position)) {   // restarted: forget the old run
         Object.keys(readings).forEach(function (k) { readings[k] = []; });
         forecast.key = null; forecast.byBuilding = {};

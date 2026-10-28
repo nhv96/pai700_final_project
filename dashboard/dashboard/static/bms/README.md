@@ -6,6 +6,8 @@ The building-management display for Trollhättan Stad / Kraftstaden (a teammate'
 
 - **Control panel:** a status bar (how many buildings are alert / watch / no data / ok), the buildings sorted worst first with the main reason under the name, and the replayed buildings (heat now, last 24 h, kWh/m², outdoor temperature) and a drawer per building with its last 24 hours.
 - **Smart heating:** a simulated 60 m² classroom, legacy (baseline) vs combined (optimized) controller, for the last 1-7 completed days before the clock, on the weather of the selected building. Plus the AI heat forecast (1, 6, 24 h) made at the clock's hour.
+- **Clock (top bar, left of the outdoor temperature):** the shared replay clock as the data's own time (UTC+1, whatever the browser's time zone), with playing / paused / finished and the speed. It follows the playback console at once (server-sent events), not on the page's slower data refresh.
+- **Time zone:** every date and time on the page is the data's own time (UTC+1 all year), whatever the browser's time zone is (`dataDate` in `dashboard.js`).
 - **Settings:** °C/°F and light/dark theme (kept in the browser).
 - **About:** data provenance, scenarios, room model, benchmarks and parameter table with confidence tags (`data/about.json`).
 

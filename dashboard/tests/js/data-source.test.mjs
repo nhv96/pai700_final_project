@@ -32,7 +32,7 @@ function setup({ position, fail = {} }) {
   const calls = [];
   const timers = [];
   let listener = null;
-  const emitted = [], statuses = [];
+  const emitted = [], statuses = [], clocks = [];
   const json = (body, ok = true) => Promise.resolve({ ok, json: () => Promise.resolve(body) });
   const fetch = (url) => {
     calls.push(url);
@@ -65,8 +65,8 @@ function setup({ position, fail = {} }) {
       await new Promise((r) => setImmediate(r));
     }
   };
-  window.BmsSource.start({ onData: (d) => emitted.push(d), onStatus: (s) => statuses.push(s) });
-  return { source: window.BmsSource, calls, emitted, statuses, flush, push: (pos) => listener({ data: JSON.stringify(clockState(pos)) }), last: () => JSON.parse(JSON.stringify(emitted[emitted.length - 1])) };   // plain objects: the vm has its own Array
+  window.BmsSource.start({ onData: (d) => emitted.push(d), onStatus: (s) => statuses.push(s), onClock: (c) => clocks.push(c) });
+  return { source: window.BmsSource, calls, emitted, statuses, clocks, flush, push: (pos) => listener({ data: JSON.stringify(clockState(pos)) }), last: () => JSON.parse(JSON.stringify(emitted[emitted.length - 1])) };   // plain objects: the vm has its own Array
 }
 
 test("before the replay starts: buildings without values, nothing fetched", async () => {
@@ -194,4 +194,14 @@ test("a status failure is reported, the rest still works", async () => {
   assert.equal(d.buildings[0].status, null);
   assert.equal(d.status.error, "forecast down");
   assert.equal(d.buildings[0].heat_kw, 2);
+});
+
+test("the clock is passed on at once, before any data has loaded", async () => {
+  const t = setup({ position: "2022-11-08T09:00:00+01:00" });
+  await t.flush();
+  const n = t.clocks.length;
+  assert.equal(t.clocks[0].position, "2022-11-08T09:00:00+01:00");
+  t.push("2022-11-08T10:00:00+01:00");
+  assert.equal(t.clocks.length, n + 1);                         // no refresh needed
+  assert.equal(t.clocks[n].position, "2022-11-08T10:00:00+01:00");
 });

@@ -188,6 +188,21 @@ button, input { font-family: inherit; }
   border: 1px solid var(--border); border-radius: 100px;
   padding: 5px 12px 5px 10px; background: var(--surface-2);
 }
+.clock-chip {
+  display: flex; align-items: center; gap: 6px;
+  font-size: 12.5px; color: var(--ink-secondary);
+  border: 1px solid var(--border); border-radius: 100px;
+  padding: 5px 12px 5px 10px; background: var(--surface-2);
+}
+.clock-chip svg { width: 14px; height: 14px; color: var(--ink-muted); }
+.clock-chip strong { color: var(--ink); font-weight: 600; font-family: "IBM Plex Mono"; white-space: nowrap; }
+.clock-state { font-size: 11px; color: var(--ink-muted); white-space: nowrap; }
+.clock-state:empty { display: none; }
+.clock-chip.playing .clock-state { color: var(--good); }
+.clock-chip.playing .clock-state::before {
+  content: ""; display: inline-block; width: 6px; height: 6px; margin-right: 5px; border-radius: 50%;
+  background: var(--good); vertical-align: 1px;
+}
 .weather-chip svg { width: 14px; height: 14px; color: var(--ink-muted); }
 .weather-chip strong { color: var(--ink); font-weight: 600; font-family: "IBM Plex Mono"; }
 
@@ -731,5 +746,6 @@ table.param-table th, table.param-table td { text-align: left; }
   .b-row .b-mode, .b-row .b-type { display: none; }
   .b-row .b-temp:nth-child(n+4):nth-child(-n+6) { display: none; }
   .weather-fx { left: 0; }
+  .clock-state { display: none; }
 }
 .b-row.b-head .b-temp { font-family: inherit; font-size: 11px; font-weight: 600; color: var(--ink-muted); }
